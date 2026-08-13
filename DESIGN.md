@@ -63,3 +63,4 @@ Whether the web client can deliver native semantics is unresolved — Compose Mu
 - **DQ-3** Should the product support light mode, dark mode, or both?
 - **DQ-4** Do existing brand assets need to be incorporated or reconciled with `logo.svg`?
 - **DQ-5** Should the provisional system-font direction remain, or should an open-licensed brand typeface be selected?
+- **DQ-6** What on-screen privacy conventions should the clients apply for shared or observed devices — sensitive-content masking, app re-lock after inactivity, and task-switcher snapshot handling — given a household adversary or physical-access attacker viewing health, journal, and legal notes on an unlocked device? The design-language rules are owned here; the platform mechanisms and their decision are `SECURITY.md` SQ-14 (threats T-8, T-51).
