@@ -1,24 +1,15 @@
 # AfterImpact — Requirements
 
-Car Accident Management Software: an app that helps a person manage the aftermath of a car accident — paperwork, health issues, and getting life back on track.
+AfterImpact helps a person manage the aftermath of a car accident: paperwork, accident-related health issues, and getting life back on track.
 
-This document owns WHAT the system must do. Architecture, technology choices, deployment, and visual design are out of scope here. The project notes are the root source of truth; where they are silent, this document elaborates them through recorded decisions (`D-n` in **Resolved Decisions & Assumptions**). Every requirement traces to the notes directly or through a decision. `TO BE DECIDED` marks a single unresolved value inside an otherwise clear requirement.
-
-## Required Requirement Inputs
-
-- Project purpose: Assist a person who has had a recent car accident in managing associated paperwork, tracking accident-related health issues, and getting their life back on track.
-- Primary users / actors: The accident victim, as the sole account owner and only actor (D-2). No admin, helper, or professional roles in v1.
-- Core workflows: Account access; recording an accident case; storing and organizing paperwork; tracking health issues, treatments, and appointments; working a recovery checklist with tasks, deadlines, and reminders; managing case contacts; tracking accident-related expenses; keeping a journal/timeline; exporting data for insurers, attorneys, or providers.
-- Business objects / data entities: User, Case (accident), Document, Health Issue, Progress Update, Treatment, Appointment, Task, Reminder, Contact, Expense, Journal Entry, Timeline Event, Export Job (see **Data Entities**).
-- External integrations: None in v1; all data is entered by the user, and exports substitute for integrations (D-7).
-- Authentication / roles: Email + password with mandatory email verification; optional TOTP two-factor; a single role (account owner) with strict per-user data isolation (D-2).
-- Regulatory or privacy constraints: The system stores sensitive personal data, including health information, and must meet the privacy and security requirements in NFR-1/NFR-2; specific regulatory regimes to target are TO BE DECIDED (OQ-1).
+This document owns WHAT the system must do. Security and privacy requirements are authored in `SECURITY.md`; the visual and interaction language is `DESIGN.md`; components, technology choices, and data flow are `ARCHITECTURE.md`. Requirements elaborate the recorded decisions in **Decisions**; `TO BE DECIDED` marks an unresolved value inside an otherwise clear requirement.
 
 ## Scope
 
 In scope (v1): everything in **Functional Requirements** below — single-user accounts, accident cases, document storage, health tracking, tasks/deadlines/reminders, contacts, expenses, journal/timeline, and export.
 
 Out of scope (v1):
+
 - Multi-user access of any kind: sharing, collaboration, helper/attorney accounts (OQ-2).
 - Integrations with insurers, healthcare systems, or any third-party service (D-7).
 - Automated claim filing or form generation for specific insurers/agencies.
@@ -29,9 +20,9 @@ Out of scope (v1):
 
 ## Data Entities
 
-Logical model only; storage design belongs to later documents.
+Logical model only; storage design belongs to `ARCHITECTURE.md`.
 
-- **User** — email (unique), password credential, optional TOTP secret, notification preferences, timezone.
+- **User** — email (unique), registered passkey credentials, notification preferences, timezone.
 - **Case** — title, accident date (required), accident time/location/description (optional), status (open, archived), owned by one User. All entities below belong to exactly one Case (except User).
 - **Document** — original file, title, category, optional document date, notes, tags, links to Contact/Health Issue/Expense.
 - **Health Issue** — name, optional body area, onset date, severity (0–10), status (active, improving, resolved), description; has Progress Updates and Treatments.
@@ -50,15 +41,17 @@ Logical model only; storage design belongs to later documents.
 
 ### 1. Accounts & Authentication
 
-- **FR-1.1** The system MUST allow a person to register with an email address and password, and MUST send a verification email; the account MUST NOT be usable for sign-in until the email address is verified.
-- **FR-1.2** The system MUST enforce a minimum password length of 12 characters, MUST reject passwords found in a known-compromised-password list, and MUST NOT impose composition rules (mandatory character classes) or periodic rotation.
-- **FR-1.3** The system MUST sign in a user who presents valid verified credentials and MUST respond to any failed sign-in (wrong password, unknown email, unverified email) with the same generic error, without revealing which factor failed or whether the account exists.
-- **FR-1.4** After 5 consecutive failed sign-in attempts for an account within 15 minutes, the system MUST block further attempts for that account for at least 15 minutes or until the password is reset, and MUST log the event (NFR-1.6).
+The credential ceremonies, session mechanics, and enumeration-resistance controls that implement this section are specified in `SECURITY.md` **Authentication** and **Session management**.
+
+- **FR-1.1** The system MUST allow a person to register with an email address and MUST send a verification email; the account MUST NOT be usable for sign-in until the email address is verified.
+- **FR-1.2** The system MUST authenticate users with passkeys (WebAuthn) and MUST NOT offer passwords or any other shared-secret credential (D-9).
+- **FR-1.3** The system MUST sign in a user who completes a valid authentication ceremony with a registered credential on a verified account, and MUST show the same generic error for every failed sign-in (SEC-AUTHN-5 owns what a failure may disclose).
+- **FR-1.4** After 5 consecutive failed authentication attempts for an account within 15 minutes, the system MUST block further attempts for that account for at least 15 minutes, and MUST log the event (SEC-LOG-1).
 - **FR-1.5** The system MUST let a signed-in user sign out, immediately invalidating that session.
-- **FR-1.6** The system MUST provide password reset via a single-use, time-limited (≤ 1 hour) emailed link; the request flow MUST NOT reveal whether the email is registered, and a completed reset MUST invalidate all existing sessions.
-- **FR-1.7** The system MUST let a signed-in user change their password (requiring the current password) and change their email (requiring re-verification of the new address); a password change MUST invalidate all other sessions.
-- **FR-1.8** The system SHOULD offer TOTP two-factor authentication: enrollment MUST show one-time recovery codes, sign-in with 2FA enabled MUST require a valid code, and disabling 2FA MUST require the password plus a valid code or recovery code.
-- **FR-1.9** Every create/read/update/delete/export operation MUST be permitted only for the authenticated owner of the data; a request targeting another user's record MUST fail without disclosing whether the record exists.
+- **FR-1.6** The system MUST provide a way for a user who has lost access to every registered passkey to regain access to their account. The flow itself is TO BE DECIDED (SQ-2); SEC-AUTHN-6 constrains what it may be.
+- **FR-1.7** The system MUST let a signed-in user change their email address, requiring verification of the new address before the change takes effect.
+- **FR-1.8** The system MUST let a signed-in user register additional passkeys, view their registered credentials, and revoke any of them (SEC-AUTHN-8 governs the revocation guard and notification; SEC-SESSION-5 the session consequences).
+- **FR-1.9** Every create/read/update/delete/export operation MUST be permitted only for the authenticated owner of the data. SEC-AUTHZ-1 through SEC-AUTHZ-5 own how that is enforced and what a denied request may disclose.
 - **FR-1.10** Sessions MUST expire after 30 days regardless of activity and SHOULD expire after 24 hours of inactivity (defaults; both TO BE DECIDED with OQ-1's regulatory outcome).
 
 ### 2. Accident Cases
@@ -80,7 +73,7 @@ Logical model only; storage design belongs to later documents.
 - **FR-3.6** The system MUST let the user edit a document's metadata at any time without altering the stored file.
 - **FR-3.7** The system SHOULD let the user replace a document's file while retaining access to prior versions.
 - **FR-3.8** Deleting a document MUST require confirmation; deleted documents SHOULD be recoverable from a trash area for 30 days before permanent removal.
-- **FR-3.9** The system SHOULD scan uploads for malware and MUST, if scanning is enabled, reject a flagged file with a notice to the user.
+- **FR-3.9** The system SHOULD scan uploads for malware and MUST, if scanning is enabled, reject a flagged file with a notice to the user (SEC-FILE-4).
 - **FR-3.10** The system MUST enforce a per-user storage quota (default 10 GB, TO BE DECIDED), MUST reject uploads that would exceed it with an error showing current usage, and MUST display current usage on request.
 
 ### 4. Health Issues & Appointments
@@ -133,29 +126,11 @@ Logical model only; storage design belongs to later documents.
 
 - **FR-9.1** The system MUST generate a case summary as a PDF containing user-selected sections from: case details, contacts, document index, health issues with progress history, appointments, task status, expense report (FR-7.3), and the full timeline; generation MUST complete within 60 seconds and the file MUST be downloadable in-app.
 - **FR-9.2** The system MUST let the user export all of their account data as a downloadable archive containing a machine-readable form (JSON or CSV) of every record plus every original uploaded file; the export runs asynchronously and MUST notify the user in-app when ready.
-- **FR-9.3** The system MUST let the user delete their account after re-entering their password and confirming; all personal data MUST be permanently deleted within 30 days, and within 90 days from backups.
+- **FR-9.3** The system MUST let the user delete their account after a fresh re-authentication and an explicit confirmation; all personal data MUST be permanently deleted within 30 days, and within 90 days from backups.
 
 ## Non-Functional Requirements
 
-### 1. Security
-
-- **NFR-1.1** All client–server communication MUST use TLS 1.2 or higher; the system MUST NOT serve any functionality over cleartext connections.
-- **NFR-1.2** All stored personal data, including uploaded files and backups, MUST be encrypted at rest.
-- **NFR-1.3** Passwords MUST be stored using a memory-hard adaptive hashing scheme consistent with current OWASP Password Storage guidance; the system MUST NOT be able to reproduce a user's password.
-- **NFR-1.4** Uploaded files MUST NOT be retrievable via unauthenticated or non-authorized requests (no public or guessable URLs); every file fetch is subject to FR-1.9.
-- **NFR-1.5** User-uploaded content MUST be delivered such that it cannot execute as active content (scripts/HTML) in the application's origin.
-- **NFR-1.6** The system MUST keep a security event log (sign-ins, failed sign-ins, lockouts, password/email/2FA changes, exports, account deletions) with timestamp and source IP, retained at least 12 months; the user SHOULD be able to view their own recent security activity.
-- **NFR-1.7** Application logs MUST NOT contain passwords, session tokens, file contents, or health data.
-- **NFR-1.8** The application MUST verify against OWASP ASVS (current version) Level 2; a release MUST NOT ship with open critical- or high-severity security findings.
-- **NFR-1.9** Third-party dependencies with known critical vulnerabilities MUST be patched or mitigated before release, and within 30 days when discovered post-release.
-
-### 2. Privacy
-
-- **NFR-2.1** Personal data MUST be used solely to provide the service to its owner; the system MUST NOT sell or share user data with third parties, and authenticated pages MUST NOT include third-party advertising or marketing trackers.
-- **NFR-2.2** A privacy policy MUST be viewable before registration, and registration MUST record the user's acceptance.
-- **NFR-2.3** The system MUST collect only data that serves the functional requirements (data minimization).
-- **NFR-2.4** Data portability and erasure MUST be honored through FR-9.2 and FR-9.3 within the timelines stated there.
-- **NFR-2.5** In the event of a personal-data breach, affected users MUST be notified without undue delay, consistent with applicable law (jurisdictions TO BE DECIDED — OQ-1).
+Security (`NFR-1`) and privacy (`NFR-2`) requirements are authored in `SECURITY.md`, which owns them along with the controls that enforce them. Their IDs are unchanged and remain the reference mechanism.
 
 ### 3. Reliability
 
@@ -171,7 +146,7 @@ Logical model only; storage design belongs to later documents.
 
 ### 5. Usability & Accessibility
 
-- **NFR-5.1** All user-facing screens MUST conform to WCAG 2.2 Level AA.
+- **NFR-5.1** All user-facing screens MUST conform to WCAG 2.2 Level AA. `DESIGN.md` **Accessibility** owns the design-language rules that achieve this.
 - **NFR-5.2** All functionality MUST be usable on both mobile (viewport ≥ 360 px wide) and desktop form factors.
 - **NFR-5.3** Error messages shown to users MUST state in plain language what happened and what the user can do next; raw technical errors MUST NOT be shown.
 - **NFR-5.4** v1 ships in English only (D-8); user-facing copy SHOULD target roughly an 8th-grade reading level, since users may be injured, stressed, or medicated.
@@ -182,22 +157,23 @@ Logical model only; storage design belongs to later documents.
 - **NFR-6.1** Every record MUST carry created and last-updated timestamps, stored in UTC and displayed in the user's timezone.
 - **NFR-6.2** Monetary values MUST be stored and computed exactly (no floating-point rounding errors); all totals MUST be accurate to the cent.
 
-## Resolved Decisions & Assumptions
+## Decisions
 
-Decisions elaborating the project notes. Any may be revisited; requirements cite them for traceability.
+Decisions that requirements elaborate. Any may be revisited; requirements cite them for traceability.
 
-- **D-1** "Paperwork" = user-uploaded files with metadata, categories, search, and export (FR-3), plus date-driven obligations handled as tasks/deadlines (FR-5). Structured claim-form authoring is out of scope v1. (resolves former OQ-1)
-- **D-2** v1 is strictly single-user: one actor (the accident victim), one role, authenticated per FR-1, hard per-user isolation per FR-1.9. Sharing/helper access deferred (OQ-2). (resolves former OQ-2)
-- **D-3** Health issue model per FR-4/Data Entities: named issue with severity 0–10, status lifecycle active→improving→resolved, timestamped progress updates, optional treatments, linked providers/documents/expenses/appointments. (resolves former OQ-3)
-- **D-4** "Get your life back on track" = guided starter checklist + tasks/deadlines/reminders (FR-5) + expense tracking (FR-7) + journal/timeline (FR-8) + shareable exports (FR-9). (resolves former OQ-4)
-- **D-5** All user data is treated as sensitive personal data (it includes health information) and protected per NFR-1/NFR-2 regardless of which regulatory regime is ultimately targeted (OQ-1). (resolves former OQ-5)
-- **D-6** A user can manage multiple accidents; the Case is the anchor entity (FR-2). (resolves former OQ-6)
-- **D-7** v1 has no external integrations; all data is manually entered, and exports (FR-9) serve insurers/attorneys/providers instead. (resolves former OQ-7)
+- **D-1** "Paperwork" = user-uploaded files with metadata, categories, search, and export (FR-3), plus date-driven obligations handled as tasks/deadlines (FR-5). Structured claim-form authoring is out of scope v1.
+- **D-2** v1 is strictly single-user: one actor (the accident victim), one role, authenticated per FR-1, hard per-user isolation per FR-1.9. Sharing/helper access deferred (OQ-2).
+- **D-3** Health issue model per FR-4/**Data Entities**: named issue with severity 0–10, status lifecycle active→improving→resolved, timestamped progress updates, optional treatments, linked providers/documents/expenses/appointments.
+- **D-4** "Get your life back on track" = guided starter checklist + tasks/deadlines/reminders (FR-5) + expense tracking (FR-7) + journal/timeline (FR-8) + shareable exports (FR-9).
+- **D-5** All user data is treated as sensitive personal data (it includes health information) and protected per `SECURITY.md` regardless of which regulatory regime is ultimately targeted (OQ-1).
+- **D-6** A user can manage multiple accidents; the Case is the anchor entity (FR-2).
+- **D-7** v1 has no external integrations; all data is manually entered, and exports (FR-9) serve insurers/attorneys/providers instead. Outbound email is the sole exception (FR-1.1, FR-1.7, FR-5.6).
 - **D-8** Provisional defaults chosen to make requirements testable, each individually adjustable: accepted file types and 25 MB file limit (FR-3.1), 10 GB quota (FR-3.10), USD single currency (FR-7.5), English-only UI (NFR-5.4), case-scoped contacts (FR-6.2), session lifetimes (FR-1.10), starter checklist content (FR-5.1).
+- **D-9** Passkeys (FR-1.2) were chosen over passwords for a product holding health data: there is no shared secret to phish, reuse, or expose in a breach dump, and no second factor to bolt on. The cost is that account recovery has no default answer — FR-1.6 requires one to exist and SQ-2 must design it.
 
 ## Open Questions
 
-- **OQ-1** Which jurisdictions and regulatory regimes must v1 satisfy (e.g., GDPR, CCPA/CPRA, state health-privacy laws)? Determines NFR-2 specifics, breach-notification rules, and may tighten FR-1.10/FR-9.3 timelines.
+- **OQ-1** Which jurisdictions and regulatory regimes must v1 satisfy (e.g., GDPR, CCPA/CPRA, state health-privacy laws)? Determines NFR-2 specifics, breach-notification rules, and may tighten FR-1.10/FR-9.3 timelines. Narrowed for health-specific regimes by SQ-1.
 - **OQ-2** Is single-user v1 acceptable, or is read-only sharing with a trusted helper or attorney needed soon? A near-term yes changes the authentication/authorization model and FR-9 sharing scope.
 - **OQ-3** The starter checklist content (FR-5.1) needs review by someone with insurance/legal domain knowledge before it ships. What is the confirmed list?
 - **OQ-4** Are notification channels beyond in-app and email (SMS, mobile push) required, and are quiet hours needed? Affects FR-5.6.
