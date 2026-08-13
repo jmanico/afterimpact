@@ -1,45 +1,206 @@
 # AfterImpact — Requirements
 
-Car Accident Management Software. This document owns WHAT the system must do. Architecture, technology choices, deployment, and visual design are out of scope here.
+Car Accident Management Software: an app that helps a person manage the aftermath of a car accident — paperwork, health issues, and getting life back on track.
+
+This document owns WHAT the system must do. Architecture, technology choices, deployment, and visual design are out of scope here. The project notes are the root source of truth; where they are silent, this document elaborates them through recorded decisions (`D-n` in **Resolved Decisions & Assumptions**). Every requirement traces to the notes directly or through a decision. `TO BE DECIDED` marks a single unresolved value inside an otherwise clear requirement.
 
 ## Required Requirement Inputs
 
-- Project purpose: Assist a person who has had a recent car accident in managing associated paperwork, tracking health issues, and generally getting their life back on track.
-- Primary users / actors: A person recovering from a recent car accident (the accident victim). No other actors are named in the notes.
-- Core workflows: (1) Managing accident-related paperwork; (2) Tracking accident-related health issues; (3) Tracking overall recovery — getting life back on track after a major accident.
-- Business objects / data entities: Accident, paperwork/documents, health issues. Further entities UNKNOWN.
-- External integrations: UNKNOWN
-- Authentication / roles: UNKNOWN
-- Regulatory or privacy constraints: UNKNOWN (health-related data is involved, but the notes name no specific regulation — see OQ-5)
+- Project purpose: Assist a person who has had a recent car accident in managing associated paperwork, tracking accident-related health issues, and getting their life back on track.
+- Primary users / actors: The accident victim, as the sole account owner and only actor (D-2). No admin, helper, or professional roles in v1.
+- Core workflows: Account access; recording an accident case; storing and organizing paperwork; tracking health issues, treatments, and appointments; working a recovery checklist with tasks, deadlines, and reminders; managing case contacts; tracking accident-related expenses; keeping a journal/timeline; exporting data for insurers, attorneys, or providers.
+- Business objects / data entities: User, Case (accident), Document, Health Issue, Progress Update, Treatment, Appointment, Task, Reminder, Contact, Expense, Journal Entry, Timeline Event, Export Job (see **Data Entities**).
+- External integrations: None in v1; all data is entered by the user, and exports substitute for integrations (D-7).
+- Authentication / roles: Email + password with mandatory email verification; optional TOTP two-factor; a single role (account owner) with strict per-user data isolation (D-2).
+- Regulatory or privacy constraints: The system stores sensitive personal data, including health information, and must meet the privacy and security requirements in NFR-1/NFR-2; specific regulatory regimes to target are TO BE DECIDED (OQ-1).
+
+## Scope
+
+In scope (v1): everything in **Functional Requirements** below — single-user accounts, accident cases, document storage, health tracking, tasks/deadlines/reminders, contacts, expenses, journal/timeline, and export.
+
+Out of scope (v1):
+- Multi-user access of any kind: sharing, collaboration, helper/attorney accounts (OQ-2).
+- Integrations with insurers, healthcare systems, or any third-party service (D-7).
+- Automated claim filing or form generation for specific insurers/agencies.
+- Medical or legal advice of any kind (FR-4.9, FR-5.8).
+- Payments or monetization features.
+- Languages other than English; currencies other than a single per-user currency (D-8, OQ-6).
+- SMS and push notification channels (OQ-4).
+
+## Data Entities
+
+Logical model only; storage design belongs to later documents.
+
+- **User** — email (unique), password credential, optional TOTP secret, notification preferences, timezone.
+- **Case** — title, accident date (required), accident time/location/description (optional), status (open, archived), owned by one User. All entities below belong to exactly one Case (except User).
+- **Document** — original file, title, category, optional document date, notes, tags, links to Contact/Health Issue/Expense.
+- **Health Issue** — name, optional body area, onset date, severity (0–10), status (active, improving, resolved), description; has Progress Updates and Treatments.
+- **Progress Update** — timestamp, note, optional severity (0–10).
+- **Treatment** — name, start/end dates, prescribing provider (Contact), notes.
+- **Appointment** — date/time, provider (Contact, optional), location, purpose, linked Health Issues, outcome notes.
+- **Task** — title, optional due date, category, notes, done flag + completion timestamp, hard-deadline flag, linked records.
+- **Reminder** — target record (Task or Appointment), fire datetime, delivery state.
+- **Contact** — name, role (insurance adjuster, insurance company, attorney, medical provider, repair shop, other driver, witness, employer, other), phone/email/address, reference numbers (e.g., policy #, claim #), notes.
+- **Expense** — amount, date, category, payment status, optional payee (Contact), linked receipt Document, linked Health Issue, reimbursement records.
+- **Journal Entry** — user-authored text, entry date (backdatable), created/edited timestamps, optional linked Contact/records.
+- **Timeline Event** — system-generated record of a case action (see FR-8.1).
+- **Export Job** — requested scope, status, produced artifact.
 
 ## Functional Requirements
 
-### Accident Record
+### 1. Accounts & Authentication
 
-- **FR-1.1** The system MUST allow a user to record a car accident so that paperwork, health issues, and recovery items can be associated with it.
+- **FR-1.1** The system MUST allow a person to register with an email address and password, and MUST send a verification email; the account MUST NOT be usable for sign-in until the email address is verified.
+- **FR-1.2** The system MUST enforce a minimum password length of 12 characters, MUST reject passwords found in a known-compromised-password list, and MUST NOT impose composition rules (mandatory character classes) or periodic rotation.
+- **FR-1.3** The system MUST sign in a user who presents valid verified credentials and MUST respond to any failed sign-in (wrong password, unknown email, unverified email) with the same generic error, without revealing which factor failed or whether the account exists.
+- **FR-1.4** After 5 consecutive failed sign-in attempts for an account within 15 minutes, the system MUST block further attempts for that account for at least 15 minutes or until the password is reset, and MUST log the event (NFR-1.6).
+- **FR-1.5** The system MUST let a signed-in user sign out, immediately invalidating that session.
+- **FR-1.6** The system MUST provide password reset via a single-use, time-limited (≤ 1 hour) emailed link; the request flow MUST NOT reveal whether the email is registered, and a completed reset MUST invalidate all existing sessions.
+- **FR-1.7** The system MUST let a signed-in user change their password (requiring the current password) and change their email (requiring re-verification of the new address); a password change MUST invalidate all other sessions.
+- **FR-1.8** The system SHOULD offer TOTP two-factor authentication: enrollment MUST show one-time recovery codes, sign-in with 2FA enabled MUST require a valid code, and disabling 2FA MUST require the password plus a valid code or recovery code.
+- **FR-1.9** Every create/read/update/delete/export operation MUST be permitted only for the authenticated owner of the data; a request targeting another user's record MUST fail without disclosing whether the record exists.
+- **FR-1.10** Sessions MUST expire after 30 days regardless of activity and SHOULD expire after 24 hours of inactivity (defaults; both TO BE DECIDED with OQ-1's regulatory outcome).
 
-### Paperwork Management
+### 2. Accident Cases
 
-- **FR-2.1** The system MUST allow a user to add accident-associated paperwork items to their accident record.
-- **FR-2.2** The system MUST allow a user to view the paperwork items associated with their accident.
-- **FR-2.3** The system SHOULD allow a user to update or remove a paperwork item they previously added.
+- **FR-2.1** The system MUST allow a user to create a case with an accident date (required, MUST NOT be in the future) and optional time, location, description, and title; when no title is given the system MUST derive one from the accident date.
+- **FR-2.2** The system MUST support multiple cases per user and MUST list them with open cases first, newest accident date first.
+- **FR-2.3** The system MUST allow the user to edit any case field at any time, subject to the same validation as creation.
+- **FR-2.4** The system MUST show a per-case overview containing at minimum: count of open tasks, count of overdue tasks, next upcoming appointment, upcoming deadlines within 7 days, expense totals (FR-7.3), and the most recent timeline events.
+- **FR-2.5** The system MUST allow the user to archive a case (hiding it from the default list) and to reverse the archive at any time with no data loss.
+- **FR-2.6** The system MUST allow the user to delete a case only after an explicit confirmation that states all contained records will be removed; deletion MUST remove all case data, and SHOULD be undoable for 30 days before becoming permanent.
 
-### Health Issue Tracking
+### 3. Documents & Paperwork
 
-- **FR-3.1** The system MUST allow a user to record health issues resulting from their accident.
-- **FR-3.2** The system MUST allow a user to view the health issues recorded for their accident.
-- **FR-3.3** The system SHOULD allow a user to update a health issue as it changes over time (fields and status values TO BE DECIDED — see OQ-3).
+- **FR-3.1** The system MUST let the user upload files of types PDF, JPEG, PNG, HEIC, WebP, DOCX, XLSX, and TXT up to 25 MB per file (both lists are defaults, TO BE DECIDED), and MUST reject any other type or oversize file with an error naming the violated rule.
+- **FR-3.2** Each document MUST have a title (defaulting to the filename) and exactly one category from: police & legal, insurance, medical record, bill/invoice, repair & vehicle, correspondence, receipt, identity, other; and MAY have a document date, notes, tags, and links to a contact, health issue, or expense.
+- **FR-3.3** The system MUST list a case's documents with filtering by category, tag, and date range, and sorting by document date or upload date.
+- **FR-3.4** The system MUST provide text search over document titles, notes, and tags within a case, and MAY additionally index file contents (e.g., OCR).
+- **FR-3.5** The system MUST let the user view PDFs and images in the app and download any document as the byte-identical original file.
+- **FR-3.6** The system MUST let the user edit a document's metadata at any time without altering the stored file.
+- **FR-3.7** The system SHOULD let the user replace a document's file while retaining access to prior versions.
+- **FR-3.8** Deleting a document MUST require confirmation; deleted documents SHOULD be recoverable from a trash area for 30 days before permanent removal.
+- **FR-3.9** The system SHOULD scan uploads for malware and MUST, if scanning is enabled, reject a flagged file with a notice to the user.
+- **FR-3.10** The system MUST enforce a per-user storage quota (default 10 GB, TO BE DECIDED), MUST reject uploads that would exceed it with an error showing current usage, and MUST display current usage on request.
 
-### Recovery Tracking
+### 4. Health Issues & Appointments
 
-- **FR-4.1** The system MUST help a user track their overall recovery after a major accident ("getting life back on track"); the concrete tasks or areas covered are TO BE DECIDED — see OQ-4.
+- **FR-4.1** The system MUST let the user record a health issue with a name (required) and optional body area, onset date (MUST NOT be in the future), severity (integer 0–10), and description.
+- **FR-4.2** A health issue MUST carry a status of active, improving, or resolved; the user MUST be able to change status at any time, and each change MUST be timestamped and visible in the issue's history.
+- **FR-4.3** The system MUST let the user add timestamped progress updates (note plus optional severity 0–10) to a health issue and MUST display them in chronological order; severity over time SHOULD be shown as a chart.
+- **FR-4.4** The system SHOULD let the user record treatments/medications on a health issue (name, start/end dates, prescribing provider, notes) as recordkeeping only.
+- **FR-4.5** The system MUST let the user link providers (contacts), documents, expenses, and appointments to a health issue and navigate between linked records.
+- **FR-4.6** The system MUST let the user create appointments with date/time (required; past or future), and optional provider (contact), location, purpose, and linked health issues; and MUST show an upcoming-appointments list per case.
+- **FR-4.7** Creating a future appointment MUST create a default reminder 24 hours before it (via FR-5.6), which the user MAY change or remove.
+- **FR-4.8** The system MUST let the user record outcome notes on an appointment after it occurs.
+- **FR-4.9** The system MUST NOT present diagnoses, treatment recommendations, or any other medical advice; health features are recordkeeping only.
+
+### 5. Recovery Tasks, Deadlines & Reminders
+
+- **FR-5.1** On case creation the system MUST offer a starter recovery checklist that the user can accept in full, in part, or skip; it MUST include at least: notify insurance company; obtain the police/accident report; photograph vehicle damage; seek a medical evaluation; obtain repair estimates; arrange alternate transportation; notify employer and track missed work; review policy coverage and filing deadlines; start tracking expenses. (Final content TO BE DECIDED — OQ-3.)
+- **FR-5.2** The system MUST let the user create a task with a title (required) and optional due date, notes, category (insurance, legal, medical, vehicle, financial, personal), and links to case records.
+- **FR-5.3** The system MUST let the user mark a task complete or not complete; completion MUST be timestamped and MUST appear on the timeline (FR-8.1).
+- **FR-5.4** The system MUST let the user edit and delete tasks.
+- **FR-5.5** The system MUST visibly flag tasks whose due date has passed without completion, and include them in the case overview's overdue count (FR-2.4).
+- **FR-5.6** The user MUST be able to set one or more reminder date-times on any task or appointment; the system MUST deliver an in-app notification within 5 minutes of each reminder time and SHOULD also deliver email; the user MUST be able to turn email reminders on or off account-wide.
+- **FR-5.7** The user SHOULD be able to flag a dated task as a hard deadline, causing a visible countdown and escalating reminders at 30, 7, and 1 day(s) before the due date.
+- **FR-5.8** All guidance content (including the starter checklist) MUST be accompanied by a notice that it is general organizational guidance, not legal or medical advice.
+
+### 6. Contacts
+
+- **FR-6.1** The system MUST let the user add a contact to a case with a name (required), one role from the set in **Data Entities**, and optional phone, email, address, reference numbers (e.g., policy or claim numbers), and notes.
+- **FR-6.2** Contacts are case-scoped: a contact MUST belong to exactly one case (D-8).
+- **FR-6.3** The system MUST let the user edit and delete contacts; deleting a contact MUST NOT delete journal entries, documents, or other records that referenced it — those records MUST retain the contact's name as text.
+- **FR-6.4** The system MUST list a case's contacts filterable by role.
+
+### 7. Expenses
+
+- **FR-7.1** The system MUST let the user record an expense with amount (required, > 0, two decimal places) and date (required), one category from: medical, vehicle repair, rental/transport, lost wages, legal, insurance, other; a payment status of unpaid, paid, submitted for reimbursement, or reimbursed; and optional payee (contact), notes, linked receipt document, and linked health issue.
+- **FR-7.2** The system MUST let the user edit expenses and delete them after confirmation.
+- **FR-7.3** The system MUST show per-case expense totals: overall, by category, by payment status, and the total not yet reimbursed.
+- **FR-7.4** The system SHOULD support recording partial reimbursements (amount + date) against an expense and MUST, where supported, show the remaining balance.
+- **FR-7.5** All amounts in an account use a single currency, default USD (TO BE DECIDED — OQ-6).
+- **FR-7.6** The system MUST export a case's expense list as CSV including all fields in FR-7.1 and the totals in FR-7.3.
+
+### 8. Timeline & Journal
+
+- **FR-8.1** The system MUST automatically record a timestamped timeline event when, at minimum: a case is created or edited; a document is added; a task is completed; an appointment is created or given outcome notes; an expense is added; a health issue is created or changes status.
+- **FR-8.2** The system MUST let the user write journal entries (free text) with an entry date that MAY be in the past (backdating for events recalled later), and optional links to a contact or other case records — e.g., a summary of a phone call with an adjuster.
+- **FR-8.3** The system MUST display timeline events and journal entries together in date order (newest first by default) with filtering by type and date range.
+- **FR-8.4** Journal entries MUST visibly show both their creation timestamp and last-edited timestamp; the system SHOULD retain and display prior versions of edited entries. Users MUST NOT be able to edit or delete system-generated timeline events (they are removed only with their case or source record).
+
+### 9. Export & Data Management
+
+- **FR-9.1** The system MUST generate a case summary as a PDF containing user-selected sections from: case details, contacts, document index, health issues with progress history, appointments, task status, expense report (FR-7.3), and the full timeline; generation MUST complete within 60 seconds and the file MUST be downloadable in-app.
+- **FR-9.2** The system MUST let the user export all of their account data as a downloadable archive containing a machine-readable form (JSON or CSV) of every record plus every original uploaded file; the export runs asynchronously and MUST notify the user in-app when ready.
+- **FR-9.3** The system MUST let the user delete their account after re-entering their password and confirming; all personal data MUST be permanently deleted within 30 days, and within 90 days from backups.
+
+## Non-Functional Requirements
+
+### 1. Security
+
+- **NFR-1.1** All client–server communication MUST use TLS 1.2 or higher; the system MUST NOT serve any functionality over cleartext connections.
+- **NFR-1.2** All stored personal data, including uploaded files and backups, MUST be encrypted at rest.
+- **NFR-1.3** Passwords MUST be stored using a memory-hard adaptive hashing scheme consistent with current OWASP Password Storage guidance; the system MUST NOT be able to reproduce a user's password.
+- **NFR-1.4** Uploaded files MUST NOT be retrievable via unauthenticated or non-authorized requests (no public or guessable URLs); every file fetch is subject to FR-1.9.
+- **NFR-1.5** User-uploaded content MUST be delivered such that it cannot execute as active content (scripts/HTML) in the application's origin.
+- **NFR-1.6** The system MUST keep a security event log (sign-ins, failed sign-ins, lockouts, password/email/2FA changes, exports, account deletions) with timestamp and source IP, retained at least 12 months; the user SHOULD be able to view their own recent security activity.
+- **NFR-1.7** Application logs MUST NOT contain passwords, session tokens, file contents, or health data.
+- **NFR-1.8** The application MUST verify against OWASP ASVS (current version) Level 2; a release MUST NOT ship with open critical- or high-severity security findings.
+- **NFR-1.9** Third-party dependencies with known critical vulnerabilities MUST be patched or mitigated before release, and within 30 days when discovered post-release.
+
+### 2. Privacy
+
+- **NFR-2.1** Personal data MUST be used solely to provide the service to its owner; the system MUST NOT sell or share user data with third parties, and authenticated pages MUST NOT include third-party advertising or marketing trackers.
+- **NFR-2.2** A privacy policy MUST be viewable before registration, and registration MUST record the user's acceptance.
+- **NFR-2.3** The system MUST collect only data that serves the functional requirements (data minimization).
+- **NFR-2.4** Data portability and erasure MUST be honored through FR-9.2 and FR-9.3 within the timelines stated there.
+- **NFR-2.5** In the event of a personal-data breach, affected users MUST be notified without undue delay, consistent with applicable law (jurisdictions TO BE DECIDED — OQ-1).
+
+### 3. Reliability
+
+- **NFR-3.1** The service MUST target at least 99.5% monthly availability, excluding announced maintenance.
+- **NFR-3.2** Automated backups MUST bound data loss to at most 24 hours (RPO ≤ 24 h) and restoration time to at most 12 hours (RTO ≤ 12 h); restores MUST be tested at least quarterly.
+- **NFR-3.3** An upload acknowledged to the user as successful MUST remain durable and retrievable despite the failure of any single storage component.
+
+### 4. Performance
+
+- **NFR-4.1** Interactive reads and writes (excluding uploads, search, and exports) MUST complete in under 2 seconds at the 95th percentile under normal load (provisionally 200 concurrent users — OQ-5).
+- **NFR-4.2** A 25 MB upload MUST complete within 60 seconds on a 10 Mbps connection.
+- **NFR-4.3** Document search (FR-3.4) MUST return results within 3 seconds at the 95th percentile.
+
+### 5. Usability & Accessibility
+
+- **NFR-5.1** All user-facing screens MUST conform to WCAG 2.2 Level AA.
+- **NFR-5.2** All functionality MUST be usable on both mobile (viewport ≥ 360 px wide) and desktop form factors.
+- **NFR-5.3** Error messages shown to users MUST state in plain language what happened and what the user can do next; raw technical errors MUST NOT be shown.
+- **NFR-5.4** v1 ships in English only (D-8); user-facing copy SHOULD target roughly an 8th-grade reading level, since users may be injured, stressed, or medicated.
+- **NFR-5.5** Every destructive action (delete case/document/contact/expense/account) MUST require explicit confirmation before execution.
+
+### 6. Data Integrity
+
+- **NFR-6.1** Every record MUST carry created and last-updated timestamps, stored in UTC and displayed in the user's timezone.
+- **NFR-6.2** Monetary values MUST be stored and computed exactly (no floating-point rounding errors); all totals MUST be accurate to the cent.
+
+## Resolved Decisions & Assumptions
+
+Decisions elaborating the project notes. Any may be revisited; requirements cite them for traceability.
+
+- **D-1** "Paperwork" = user-uploaded files with metadata, categories, search, and export (FR-3), plus date-driven obligations handled as tasks/deadlines (FR-5). Structured claim-form authoring is out of scope v1. (resolves former OQ-1)
+- **D-2** v1 is strictly single-user: one actor (the accident victim), one role, authenticated per FR-1, hard per-user isolation per FR-1.9. Sharing/helper access deferred (OQ-2). (resolves former OQ-2)
+- **D-3** Health issue model per FR-4/Data Entities: named issue with severity 0–10, status lifecycle active→improving→resolved, timestamped progress updates, optional treatments, linked providers/documents/expenses/appointments. (resolves former OQ-3)
+- **D-4** "Get your life back on track" = guided starter checklist + tasks/deadlines/reminders (FR-5) + expense tracking (FR-7) + journal/timeline (FR-8) + shareable exports (FR-9). (resolves former OQ-4)
+- **D-5** All user data is treated as sensitive personal data (it includes health information) and protected per NFR-1/NFR-2 regardless of which regulatory regime is ultimately targeted (OQ-1). (resolves former OQ-5)
+- **D-6** A user can manage multiple accidents; the Case is the anchor entity (FR-2). (resolves former OQ-6)
+- **D-7** v1 has no external integrations; all data is manually entered, and exports (FR-9) serve insurers/attorneys/providers instead. (resolves former OQ-7)
+- **D-8** Provisional defaults chosen to make requirements testable, each individually adjustable: accepted file types and 25 MB file limit (FR-3.1), 10 GB quota (FR-3.10), USD single currency (FR-7.5), English-only UI (NFR-5.4), case-scoped contacts (FR-6.2), session lifetimes (FR-1.10), starter checklist content (FR-5.1).
 
 ## Open Questions
 
-- **OQ-1** What forms does "paperwork" take — uploaded files/scans, structured data entry (e.g., insurance claims, police reports), deadlines/reminders, or a combination? This determines the required capabilities of FR-2.x and how they are tested.
-- **OQ-2** Are there other actors besides the accident victim (e.g., a family member/helper, lawyer, insurance agent), and does the system need accounts, authentication, or role-based access at all?
-- **OQ-3** What information must a health issue capture (symptoms, treatments, appointments, providers, status), and what is its lifecycle?
-- **OQ-4** What does "get your life back on track" concretely include — task checklists, reminders, guidance content, financial tracking, vehicle repair/replacement? This defines the scope of FR-4.1.
-- **OQ-5** Do any regulatory or privacy constraints apply (e.g., health-data or personal-data protection rules), given that the system stores health information?
-- **OQ-6** Can a user manage more than one accident, or does the system assume a single recent accident per user?
-- **OQ-7** Are external integrations expected (insurance companies, healthcare providers, document storage), or is all data entered manually by the user?
+- **OQ-1** Which jurisdictions and regulatory regimes must v1 satisfy (e.g., GDPR, CCPA/CPRA, state health-privacy laws)? Determines NFR-2 specifics, breach-notification rules, and may tighten FR-1.10/FR-9.3 timelines.
+- **OQ-2** Is single-user v1 acceptable, or is read-only sharing with a trusted helper or attorney needed soon? A near-term yes changes the authentication/authorization model and FR-9 sharing scope.
+- **OQ-3** The starter checklist content (FR-5.1) needs review by someone with insurance/legal domain knowledge before it ships. What is the confirmed list?
+- **OQ-4** Are notification channels beyond in-app and email (SMS, mobile push) required, and are quiet hours needed? Affects FR-5.6.
+- **OQ-5** What user scale should v1 support? NFR-4.1's 200-concurrent-user figure is provisional.
+- **OQ-6** Is USD-only / English-only acceptable for v1, and what is the localization timeline? Affects FR-7.5 and NFR-5.4.
+- **OQ-7** Should inactive accounts or long-closed cases be retained indefinitely, or purged after a defined period? No retention limit is currently specified beyond FR-9.3.
