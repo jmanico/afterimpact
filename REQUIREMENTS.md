@@ -36,6 +36,7 @@ Logical model only; storage design belongs to `ARCHITECTURE.md`.
 - **Journal Entry** — user-authored text, entry date (backdatable), created/edited timestamps, optional linked Contact/records.
 - **Timeline Event** — system-generated record of a case action (see FR-8.1).
 - **Export Job** — requested scope, status, produced artifact.
+- **Notification** — an in-app feed item (type, target record, created timestamp, read state): a reminder or a security message (SEC-AUTHN-11) surfaced to the user. A notification tied to a case or record is removed with it (FR-2.6) and with the account (FR-9.3); its inclusion in exports is governed by FR-9.2. (Added per T-43: the feed was previously unmodeled, so no retention, purge, or export rule could attach to items that may carry health-adjacent text.)
 
 ## Functional Requirements
 
@@ -46,7 +47,7 @@ The credential ceremonies, session mechanics, and enumeration-resistance control
 - **FR-1.1** The system MUST allow a person to register with an email address and MUST send a verification email; the account MUST NOT be usable for sign-in until the email address is verified.
 - **FR-1.2** The system MUST authenticate users with passkeys (WebAuthn) and MUST NOT offer passwords or any other shared-secret credential (D-9).
 - **FR-1.3** The system MUST sign in a user who completes a valid authentication ceremony with a registered credential on a verified account, and MUST show the same generic error for every failed sign-in (SEC-AUTHN-5 owns what a failure may disclose).
-- **FR-1.4** After 5 consecutive failed authentication attempts for an account within 15 minutes, the system MUST block further attempts for that account for at least 15 minutes, and MUST log the event (SEC-LOG-1).
+- **FR-1.4** After 5 consecutive failed authentication attempts for an account within 15 minutes, the system MUST block further attempts for that account for at least 15 minutes, and MUST log the event (SEC-LOG-1). The block applies to failed or invalid attempts and MUST NOT prevent a successful valid passkey ceremony by the owner — a valid WebAuthn assertion is cryptographic proof of possession, not a guess (T-1). Because an account-scoped block is otherwise a denial-of-service lever anyone who knows the email can renew, source-based and anti-automation throttling applies ahead of the account block (SEC-AUTHN-4, values under SQ-9).
 - **FR-1.5** The system MUST let a signed-in user sign out, immediately invalidating that session.
 - **FR-1.6** The system MUST provide a way for a user who has lost access to every registered passkey to regain access to their account. The flow itself is TO BE DECIDED (SQ-2); SEC-AUTHN-6 constrains what it may be.
 - **FR-1.7** The system MUST let a signed-in user change their email address, requiring verification of the new address before the change takes effect.
@@ -74,7 +75,7 @@ The credential ceremonies, session mechanics, and enumeration-resistance control
 - **FR-3.7** The system SHOULD let the user replace a document's file while retaining access to prior versions.
 - **FR-3.8** Deleting a document MUST require confirmation; deleted documents SHOULD be recoverable from a trash area for 30 days before permanent removal.
 - **FR-3.9** The system SHOULD scan uploads for malware and MUST, if scanning is enabled, reject a flagged file with a notice to the user (SEC-FILE-4).
-- **FR-3.10** The system MUST enforce a per-user storage quota (default 10 GB, TO BE DECIDED), MUST reject uploads that would exceed it with an error showing current usage, and MUST display current usage on request.
+- **FR-3.10** The system MUST enforce a per-user storage quota (default 10 GB, TO BE DECIDED), MUST reject uploads that would exceed it with an error showing current usage, and MUST display current usage on request. The quota calculation MUST define how trashed documents awaiting purge (FR-3.8), retained prior versions (FR-3.7), and generated export artifacts (FR-9.4) count toward usage, so a session-holding attacker cannot silently exhaust the quota with unreclaimable space and block new evidence uploads before a deadline (T-21).
 
 ### 4. Health Issues & Appointments
 
@@ -103,7 +104,7 @@ The credential ceremonies, session mechanics, and enumeration-resistance control
 
 - **FR-6.1** The system MUST let the user add a contact to a case with a name (required), one role from the set in **Data Entities**, and optional phone, email, address, reference numbers (e.g., policy or claim numbers), and notes.
 - **FR-6.2** Contacts are case-scoped: a contact MUST belong to exactly one case (D-8).
-- **FR-6.3** The system MUST let the user edit and delete contacts; deleting a contact MUST NOT delete journal entries, documents, or other records that referenced it — those records MUST retain the contact's name as text.
+- **FR-6.3** The system MUST let the user edit and delete contacts; deleting a contact MUST NOT delete journal entries, documents, or other records that referenced it — those records MUST retain the contact's name as text. The deletion confirmation (NFR-5.5) MUST disclose that the contact's name is retained as text on referencing records and therefore continues to appear in exports handed to third parties (T-42).
 - **FR-6.4** The system MUST list a case's contacts filterable by role.
 
 ### 7. Expenses
@@ -117,16 +118,17 @@ The credential ceremonies, session mechanics, and enumeration-resistance control
 
 ### 8. Timeline & Journal
 
-- **FR-8.1** The system MUST automatically record a timestamped timeline event when, at minimum: a case is created or edited; a document is added; a task is completed; an appointment is created or given outcome notes; an expense is added; a health issue is created or changes status.
+- **FR-8.1** The system MUST automatically record a timestamped timeline event when, at minimum: a case is created or edited; a document is added, has its file replaced (FR-3.7), or has its metadata edited (FR-3.6); a task is completed; an appointment is created or given outcome notes; an expense is added; a health issue is created or changes status; and any record is deleted while its case survives. Recording document replacement, metadata edits, and deletions closes a silent-tampering gap: without them, an attacker with a stolen session could substitute a doctored evidence file or delete records leaving no user-visible trace on the timeline (T-12, T-47). Whether records additionally carry independent tamper-evidence (content hashes, protected history) is SECURITY.md SQ-13.
 - **FR-8.2** The system MUST let the user write journal entries (free text) with an entry date that MAY be in the past (backdating for events recalled later), and optional links to a contact or other case records — e.g., a summary of a phone call with an adjuster.
 - **FR-8.3** The system MUST display timeline events and journal entries together in date order (newest first by default) with filtering by type and date range.
-- **FR-8.4** Journal entries MUST visibly show both their creation timestamp and last-edited timestamp; the system SHOULD retain and display prior versions of edited entries. Users MUST NOT be able to edit or delete system-generated timeline events (they are removed only with their case or source record).
+- **FR-8.4** Journal entries MUST visibly show both their creation timestamp and last-edited timestamp; the system SHOULD retain and display prior versions of edited entries. Users MUST NOT be able to edit or delete system-generated timeline events (they are removed only with their case or source record). Whether a user may delete a journal entry — and if so, with what confirmation, recovery window, and timeline coverage — is unspecified and tracked as OQ-8 (T-14).
 
 ### 9. Export & Data Management
 
 - **FR-9.1** The system MUST generate a case summary as a PDF containing user-selected sections from: case details, contacts, document index, health issues with progress history, appointments, task status, expense report (FR-7.3), and the full timeline; generation MUST complete within 60 seconds and the file MUST be downloadable in-app.
 - **FR-9.2** The system MUST let the user export all of their account data as a downloadable archive containing a machine-readable form (JSON or CSV) of every record plus every original uploaded file; the export runs asynchronously and MUST notify the user in-app when ready.
-- **FR-9.3** The system MUST let the user delete their account after a fresh re-authentication and an explicit confirmation; all personal data MUST be permanently deleted within 30 days, and within 90 days from backups.
+- **FR-9.3** The system MUST let the user delete their account after a fresh re-authentication and an explicit confirmation; all personal data MUST be permanently deleted within 30 days, and within 90 days from backups. The system SHOULD provide a user-invocable cancellation window before purge begins (duration TO BE DECIDED, constrained by the OQ-1/SQ-1 timelines), and MUST notify the verified email address when account deletion is initiated (SEC-AUTHN-11) — without either, an adversary with the unlocked device, or the injured user in error, can irreversibly destroy the entire evidentiary record with no notice and no way back, unlike the 30-day undo that FR-2.6/FR-3.8 grant to far smaller deletions (T-46).
+- **FR-9.4** Generated export artifacts stored in the file store — full-account archives (FR-9.2), case-summary PDFs (FR-9.1), and expense CSVs (FR-7.6) — MUST have a bounded lifetime after which the background worker purges them (duration TO BE DECIDED, coordinated with the retention outcome of OQ-7); an export MUST declare to the user its scope over prior document versions (FR-3.7), prior journal versions (FR-8.4), and soft-deleted or trashed records; and export artifacts MUST be counted against the FR-3.10 quota or explicitly excluded by a stated rule. A stale archive is a maximum-sensitivity aggregate that can silently retain records the user later deleted and can leak superseded drafts to attorneys and insurers if its scope is undeclared (T-18). Whether FR-9.1/FR-9.2 outputs include journal authorship metadata (creation/edit timestamps, FR-8.4) MUST be stated explicitly, preserving FR-8.4 unchanged (T-42).
 
 ## Non-Functional Requirements
 
@@ -179,4 +181,5 @@ Decisions that requirements elaborate. Any may be revisited; requirements cite t
 - **OQ-4** Are notification channels beyond in-app and email (SMS, mobile push) required, and are quiet hours needed? Affects FR-5.6.
 - **OQ-5** What user scale should v1 support? NFR-4.1's 200-concurrent-user figure is provisional.
 - **OQ-6** Is USD-only / English-only acceptable for v1, and what is the localization timeline? Affects FR-7.5 and NFR-5.4.
-- **OQ-7** Should inactive accounts or long-closed cases be retained indefinitely, or purged after a defined period? No retention limit is currently specified beyond FR-9.3.
+- **OQ-7** Should inactive accounts or long-closed cases be retained indefinitely, or purged after a defined period? No retention limit is currently specified beyond FR-9.3. Indefinite retention of a full sensitive record set maximizes breach blast radius and likely conflicts with storage-limitation principles under whichever regime OQ-1/SQ-1 selects (T-40). This question also governs the lifetime of generated export artifacts (FR-9.4); if a retention limit is set, the user MUST receive advance email warning before any automated purge.
+- **OQ-8** May a user delete a journal entry, and if so with what confirmation (NFR-5.5), recovery window, and timeline coverage (FR-8.1)? FR-8.4 forbids editing or deleting system timeline events but is silent on journal entries. Interacts with the evidentiary-integrity decision (SECURITY.md SQ-13) — T-14.

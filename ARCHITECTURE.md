@@ -54,7 +54,7 @@ Primary flows:
   - **Inputs:** Authenticated HTTPS/REST requests from the clients; job-completion signals from the background worker.
   - **Outputs:** JSON responses; streamed file downloads; rows in the RDBMS; originals into the file store; job requests to the background worker; email requests to the email boundary.
   - **Data owned or accessed:** Owns the business rules for every entity; reads/writes all RDBMS data and file-store objects on behalf of the authenticated owner only.
-  - **Open decisions:** API versioning scheme TO BE DECIDED. Whether search extends to file contents/OCR (FR-3.4 MAY) TO BE DECIDED.
+  - **Open decisions:** API versioning scheme TO BE DECIDED — when introduced, every live API version MUST route through the SEC-AUTHZ-5 centralized enforcement layer and remain within the SEC-DEPLOY-4 patch gate, so an unmaintained old version cannot become an authorization or patching bypass reachable by any network attacker (T-38). Whether search extends to file contents/OCR (FR-3.4 MAY) TO BE DECIDED; if adopted, the resulting index is a personal-data store bound by SEC-TRUST-2 and SEC-DATA-1 (T-19) and its extraction step is a hostile-content parsing surface under SEC-FILE-6 (T-17).
 
 - **Identity & session handling**
   - **Responsibility:** Registration with email verification (FR-1.1), passkey (WebAuthn) registration and authentication ceremonies (FR-1.2, FR-1.3), credential lifecycle — additional registration, listing, revocation (FR-1.8), sign-out with immediate session invalidation (FR-1.5), session lifetime enforcement (FR-1.10), account-level throttling of failed attempts (FR-1.4), email change with re-verification (FR-1.7), account recovery (FR-1.6), and re-authentication before account deletion (FR-9.3). Logically part of the API application, not a separate service — a single-role, single-user product at modest scale does not justify an external identity provider (ASSUMPTION).
@@ -78,23 +78,23 @@ Primary flows:
   - **Open decisions:** Technology (object store vs. filesystem vs. database blobs) TO BE DECIDED; NFR-3.3's single-component-failure durability is the deciding constraint.
 
 - **Background processing**
-  - **Responsibility:** Reminder scheduling and delivery within 5 minutes of fire time (FR-5.6), default and escalating reminders (FR-4.7, FR-5.7); asynchronous export jobs with in-app ready notification (FR-9.2) and PDF case-summary generation within its 60-second budget (FR-9.1); permanent purge after undo windows (FR-2.6, FR-3.8) and account-deletion completion within 30/90 days (FR-9.3); malware scanning of uploads if enabled (FR-3.9).
+  - **Responsibility:** Reminder scheduling and delivery within 5 minutes of fire time (FR-5.6), default and escalating reminders (FR-4.7, FR-5.7); asynchronous export jobs with in-app ready notification (FR-9.2) and PDF case-summary generation within its 60-second budget (FR-9.1); permanent purge after undo windows (FR-2.6, FR-3.8) and account-deletion completion within 30/90 days (FR-9.3); enforcing the export-artifact lifetime purge (FR-9.4); post-restore reconciliation — re-applying deletions, credential revocations, and session invalidations recorded after a backup point, and invalidating all sessions on restore (SEC-DATA-8); malware scanning of uploads if enabled (FR-3.9).
   - **Inputs:** Job records and schedules from the RDBMS (Reminder, Export Job, soft-delete timestamps); files from the file store.
   - **Outputs:** Delivery-state updates and notifications via the API's data; export artifacts to the file store; emails via the email boundary; deletions in RDBMS and file store.
   - **Data owned or accessed:** Owns Reminder delivery state and Export Job lifecycle; reads all case data for exports; deletes across all stores for purges.
-  - **Open decisions:** Execution model (in-process Quarkus scheduler vs. separate worker process) TO BE DECIDED — modest scale suggests in-process (ASSUMPTION); revisit if FR-9.2 export sizes threaten API responsiveness. No message broker is introduced: database-backed job state satisfies current requirements.
+  - **Open decisions:** Execution model (in-process Quarkus scheduler vs. separate worker process) TO BE DECIDED — modest scale suggests in-process (ASSUMPTION); revisit if FR-9.2 export sizes threaten API responsiveness. The worker parses attacker-influenced bytes (malware scanning FR-3.9, any FR-3.4 OCR, export embedding) while holding read-all/delete-all reach, so hostile-content-parsing isolation (SEC-FILE-6) is a deciding factor for this choice: an in-process parser exploit would reach the API application and session handling (T-17). No message broker is introduced: database-backed job state satisfies current requirements.
 
 - **Outbound email boundary (external)**
   - **Responsibility:** The system's only external integration: delivery of verification emails (FR-1.1, FR-1.7), account-recovery mail (FR-1.6; form TO BE DECIDED under SQ-2), credential-lifecycle notices (FR-1.8), email reminders honoring the account-wide toggle (FR-5.6), and breach notification if ever required (NFR-2.5).
   - **Inputs:** Send requests from the API application and background worker.
   - **Outputs:** Email to the user's verified address; delivery outcomes back to the caller.
   - **Data owned or accessed:** Transports message content; stores nothing (SEC-DATA-6 governs what may be handed to it).
-  - **Open decisions:** Provider/transport TO BE DECIDED.
+  - **Open decisions:** Provider/transport TO BE DECIDED. Delivery outcomes are returned to the caller; how persistent failure is handled is specified in SEC-DATA-6's neighbor SEC-EXT-4 — at minimum, persistent reminder-delivery failure MUST surface as an in-app notification so a silently-dead channel (provider trouble, or a mailbox attacker filtering messages) does not cause missed deadlines (T-49). Availability of this sole external channel bounds verification, recovery, and reminders (T-30), and sender authentication for the domain is required by SEC-EXT-4 (T-28).
 
 ### Trust boundaries
 
 1. **Client ↔ API:** untrusted client to trusted server; TLS only (NFR-1.1); all authorization and validation server-side (FR-1.9).
-2. **API ↔ stores (RDBMS, file store):** private network boundary; only the API application and background worker cross it. Uploaded content crossing back toward clients is treated as hostile (NFR-1.5).
+2. **API ↔ stores (RDBMS, file store):** private network boundary; only the API application and background worker cross it. Backup artifacts and any further store that holds personal data (e.g., a search index if the database-search ASSUMPTION is revisited) sit inside this boundary too (SEC-TRUST-2, T-19, T-31). Uploaded content crossing back toward clients is treated as hostile (NFR-1.5).
 3. **System ↔ email provider:** the only outbound external boundary; carries minimal personal data.
 
 Controls at these boundaries are specified in `SECURITY.md`.
@@ -114,11 +114,11 @@ Statuses: `SUPPORTED` (a named component is responsible), `PARTIALLY DEFINED` (r
 | FR-5.1–FR-5.8 (Tasks & Reminders) | REST API application; Background processing (FR-5.6, FR-5.7 delivery); clients (in-app display) | SUPPORTED | Email channel via outbound email boundary; checklist content TO BE DECIDED (OQ-3). |
 | FR-6.1–FR-6.4 (Contacts) | REST API application; Data persistence | SUPPORTED | FR-6.3 name-snapshot rule owned by the persistence design. |
 | FR-7.1–FR-7.6 (Expenses) | REST API application; Data persistence | SUPPORTED | Exact decimal handling per NFR-6.2; CSV export generated by the API (FR-7.6). |
-| FR-8.1–FR-8.4 (Timeline & Journal) | REST API application; Data persistence | SUPPORTED | Timeline events written transactionally with their triggering action. |
-| FR-9.1, FR-9.2 (Exports) | Background processing; File store; REST API application | SUPPORTED | FR-9.1's 60-second budget is a performance constraint on the PDF pipeline. |
-| FR-9.3 (Account deletion) | Identity & session handling; Background processing | SUPPORTED | Re-authentication is a fresh passkey ceremony (SEC-AUTHN-7); purge timelines owned by background processing. |
+| FR-8.1–FR-8.4 (Timeline & Journal) | REST API application; Data persistence | SUPPORTED | Timeline events written transactionally with their triggering action; FR-8.1 now records document replacement/edits and record deletions (T-12, T-47). Journal deletability is OQ-8; tamper-evidence is SQ-13. |
+| FR-9.1, FR-9.2, FR-9.4 (Exports) | Background processing; File store; REST API application | SUPPORTED | FR-9.1's 60-second budget constrains the PDF pipeline; FR-9.4 sets artifact lifetime/scope/quota (T-18); full-account export requires step-up re-auth (SEC-AUTHN-10) and out-of-band notice (SEC-AUTHN-11). |
+| FR-9.3 (Account deletion) | Identity & session handling; Background processing | SUPPORTED | Re-authentication is a fresh passkey ceremony (SEC-AUTHN-7); deletion initiation is notified (SEC-AUTHN-11) with a SHOULD cancellation window (T-46); purge timelines owned by background processing. |
 | NFR-1 (Security), NFR-2 (Privacy) | All components | SUPPORTED | Authored with their controls in SECURITY.md; the boundaries they attach to are located in **Trust boundaries** above. |
-| NFR-3 (Reliability) | Data persistence; File store | PARTIALLY DEFINED | NFR-3.2/NFR-3.3 constrain store technology choices still TO BE DECIDED; NFR-3.1 availability target depends on the UNKNOWN hosting platform. |
+| NFR-3 (Reliability) | Data persistence; File store; Background processing (restore reconciliation) | PARTIALLY DEFINED | NFR-3.2/NFR-3.3 constrain store technology choices still TO BE DECIDED; NFR-3.1 availability target depends on the UNKNOWN hosting platform. A restore under NFR-3.2 MUST reconcile post-backup deletions, credential revocations, and session invalidations (SEC-DATA-8, T-32, T-48). |
 | NFR-4 (Performance) | REST API application; Data persistence; File store | SUPPORTED | NFR-4.1/4.3 budgets sized for modest scale (OQ-5); NFR-4.2 constrains the upload path. |
 | NFR-5 (Usability & Accessibility) | Web client; Mobile client | PARTIALLY DEFINED | DESIGN.md implemented by the clients; CQ-2 (Compose web accessibility) must resolve before NFR-5.1 can be claimed on web. |
 | NFR-6 (Data Integrity) | Data persistence; REST API application | SUPPORTED | UTC storage, exact decimals in schema and API. |
@@ -126,3 +126,4 @@ Statuses: `SUPPORTED` (a named component is responsible), `PARTIALLY DEFINED` (r
 ## Cross-document questions
 
 - **CQ-2** Compose Multiplatform's web target renders to canvas; DESIGN.md's accessibility expectations (native semantics, WCAG 2.2 AA, system fonts) may not be satisfiable there today. Decide: accept Compose/Wasm with its accessibility layer, or use a different web client implementation of the shared design. Its security consequences are tracked as SQ-4.
+- **CQ-3** FR-2.6 and FR-3.8 confirmation language calls deletion "removed" / "permanent" while the data remains recoverable for a 30-day undo window and may persist longer in backups (SEC-DATA-8). The user is never told the undo window exists, and an implementer could read "permanent" as "purge immediately." Reconcile the confirmation copy (`DESIGN.md` / `REQUIREMENTS.md`), the undo windows (FR-2.6, FR-3.8), and backup retention (SEC-DATA-8). Its privacy facet is threat T-33.
