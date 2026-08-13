@@ -10,11 +10,13 @@ Read the owning document before changing anything in its domain. Each fact and r
 
 | Document | Owns | Read it before |
 | --- | --- | --- |
-| `REQUIREMENTS.md` | WHAT the system does — `FR-*`, `NFR-*`, decisions `D-*`, open questions `OQ-*` | changing observable behavior |
+| `REQUIREMENTS.md` | WHAT the system does — `FR-*`, non-functional `NFR-3`–`NFR-6`, decisions `D-*`, open questions `OQ-*` | changing observable behavior |
 | `DESIGN.md` | The design language — tokens, type and spacing scales, components, accessibility; `style-guide.html` is its rendered reference; open questions `DQ-*` | UI work |
-| `ARCHITECTURE.md` | Components, boundaries, data flow, dependency rules; cross-document questions `CQ-*` | structural changes |
-| `SECURITY.md` | Security rules `SEC-*`, third-party dependency rules `DEP-*`, threat model, open questions `SQ-*` | touching auth, input handling, data protection, or any trust boundary |
+| `ARCHITECTURE.md` | Components, boundaries, data flow, technology decisions, marker definitions; cross-document questions `CQ-*` | structural changes |
+| `SECURITY.md` | The security posture — security and privacy requirements `NFR-1.*`/`NFR-2.*`, controls `SEC-*`, dependency rules `DEP-*`, threat model, open questions `SQ-*` | touching auth, input handling, data protection, or any trust boundary |
 | `REQUIREMENT_TEMPLATE.md` | The required structure of a requirement | opening a GitHub issue |
+
+All security and privacy requirements are authored in `SECURITY.md`, stated on the control that enforces them. `REQUIREMENTS.md` does not restate them.
 
 ## Rules
 
