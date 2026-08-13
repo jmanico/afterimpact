@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="logo-title logo-desc">
+  <title id="logo-title">AfterImpact mark</title>
+  <desc id="logo-desc">Two offset, rounded paths in dark blue and teal.</desc>
+  <path fill="#234E70" d="M8 10h12v24c0 6.627 5.373 12 12 12h4v12h-4C18.745 58 8 47.255 8 34V10Z"/>
+  <path fill="#0F766E" d="M28 6h4c13.255 0 24 10.745 24 24v24H44V30c0-6.627-5.373-12-12-12h-4V6Z"/>
+</svg>

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AfterImpact Design Language</title>
+  <style>
+    :root {
+      --primary: #234E70;
+      --secondary: #0F766E;
+      --background: #F6F8FA;
+      --surface: #FFFFFF;
+      --text: #17202A;
+      --error: #B42318;
+      --success: #146C43;
+      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --s1: 4px;
+      --s2: 8px;
+      --s3: 12px;
+      --s4: 16px;
+      --s6: 24px;
+      --s8: 32px;
+      --s12: 48px;
+      --s16: 64px;
+    }
+
+    * { box-sizing: border-box; }
+    html { color-scheme: light; }
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font: 400 1rem/1.5 var(--font);
+    }
+    header, main { width: min(72rem, calc(100% - 2rem)); margin-inline: auto; }
+    header { display: flex; align-items: center; gap: var(--s4); padding-block: var(--s8); }
+    header svg { width: 56px; height: 56px; flex: 0 0 auto; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 0; font-size: 2rem; line-height: 1.25; }
+    h2 { margin-bottom: var(--s4); font-size: 1.5rem; line-height: 1.333; }
+    h3 { margin-bottom: var(--s2); font-size: 1rem; line-height: 1.5; }
+    section { margin-bottom: var(--s8); }
+    code { font-size: .875em; }
+    .lede { max-width: 68ch; margin: 0; }
+    .provisional {
+      display: inline-block;
+      margin-top: var(--s2);
+      padding: var(--s1) var(--s2);
+      border: 1px solid var(--primary);
+      border-radius: var(--s1);
+      color: var(--primary);
+      background: var(--surface);
+      font-size: .75rem;
+      line-height: 1rem;
+      font-weight: 700;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+    }
+    .notice, .panel, .swatch, .type-row, .space-row, .feedback {
+      border: 1px solid var(--primary);
+      border-radius: var(--s2);
+      background: var(--surface);
+    }
+    .notice { padding: var(--s4); margin-bottom: var(--s8); }
+    .grid { display: grid; gap: var(--s4); }
+    .swatches { grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); }
+    .swatch { overflow: hidden; }
+    .swatch-color {
+      min-height: 7rem;
+      display: flex;
+      align-items: end;
+      padding: var(--s3);
+      font-weight: 700;
+    }
+    .swatch-meta { padding: var(--s3); }
+    .swatch-meta code { display: block; }
+    .on-color { color: var(--surface); }
+    .on-light { color: var(--text); }
+    .type-list, .space-list { display: grid; gap: var(--s2); }
+    .type-row { display: grid; grid-template-columns: 5rem 1fr; align-items: baseline; gap: var(--s4); padding: var(--s3); }
+    .type-row code, .space-row code { font-size: .75rem; }
+    .t-xs { font-size: .75rem; line-height: 1rem; }
+    .t-sm { font-size: .875rem; line-height: 1.25rem; }
+    .t-base { font-size: 1rem; line-height: 1.5rem; }
+    .t-lg { font-size: 1.25rem; line-height: 1.75rem; }
+    .t-xl { font-size: 1.5rem; line-height: 2rem; }
+    .t-2xl { font-size: 2rem; line-height: 2.5rem; }
+    .t-3xl { font-size: 2.5rem; line-height: 3rem; }
+    .space-row { display: grid; grid-template-columns: 5rem 1fr; align-items: center; gap: var(--s4); padding: var(--s2) var(--s3); }
+    .space-bar { height: var(--s3); max-width: 100%; background: var(--secondary); border-radius: var(--s1); }
+    .breakpoints { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
+    .breakpoints span { padding: var(--s2) var(--s3); border: 1px solid var(--primary); border-radius: 999px; background: var(--surface); }
+    .panel { padding: var(--s6); }
+    .component-grid { grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+    .actions { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: center; }
+    button, input { min-height: 44px; border-radius: var(--s2); font: 600 1rem/1.5 var(--font); }
+    button { padding: var(--s2) var(--s4); cursor: pointer; transition: background-color 120ms ease; }
+    .button-primary { border: 1px solid var(--primary); color: var(--surface); background: var(--primary); }
+    .button-secondary { border: 1px solid var(--primary); color: var(--primary); background: var(--surface); }
+    button:hover { text-decoration: underline; text-underline-offset: .18em; }
+    .button-secondary:hover { background: var(--background); }
+    label { display: block; margin-bottom: var(--s1); font-weight: 600; }
+    input { width: 100%; padding: var(--s2) var(--s3); border: 1px solid var(--primary); color: var(--text); background: var(--surface); font-weight: 400; }
+    input[aria-invalid="true"] { border: 2px solid var(--error); }
+    .hint, .field-error { margin: var(--s1) 0 0; font-size: .875rem; line-height: 1.25rem; }
+    .field-error { color: var(--error); font-weight: 600; }
+    a { color: var(--primary); text-decoration: underline; text-decoration-thickness: .08em; text-underline-offset: .18em; }
+    a:visited { text-decoration-style: double; }
+    a:hover { text-decoration-thickness: .16em; }
+    :is(a, button, input):focus-visible {
+      outline: 3px solid var(--primary);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 2px var(--surface);
+    }
+    .focus-sample { outline: 3px solid var(--primary); outline-offset: 2px; box-shadow: 0 0 0 2px var(--surface); }
+    .feedback { padding: var(--s3) var(--s4); border-left-width: var(--s1); }
+    .feedback + .feedback { margin-top: var(--s3); }
+    .feedback-error { border-color: var(--error); color: var(--error); }
+    .feedback-success { border-color: var(--success); color: var(--success); }
+    .feedback strong { display: block; }
+    footer { padding: 0 0 var(--s8); font-size: .875rem; }
+
+    @media (min-width: 48rem) {
+      header, main { width: min(72rem, calc(100% - 4rem)); }
+      .scale-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <svg viewBox="0 0 64 64" role="img" aria-labelledby="mark-title mark-desc">
+      <title id="mark-title">AfterImpact mark</title>
+      <desc id="mark-desc">Two offset, rounded paths in dark blue and teal.</desc>
+      <path fill="#234E70" d="M8 10h12v24c0 6.627 5.373 12 12 12h4v12h-4C18.745 58 8 47.255 8 34V10Z"/>
+      <path fill="#0F766E" d="M28 6h4c13.255 0 24 10.745 24 24v24H44V30c0-6.627-5.373-12-12-12h-4V6Z"/>
+    </svg>
+    <div>
+      <h1>AfterImpact design language</h1>
+      <span class="provisional">Provisional foundation</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="notice">
+      <strong>Pending decisions:</strong> brand personality, platform targets, light/dark mode, and brand typography are <strong>TO BE DECIDED</strong>; existing brand assets are <strong>UNKNOWN</strong>. This responsive web reference, its light mode, and its system font are provisional defaults—not product platform decisions.
+    </div>
+
+    <section aria-labelledby="logo-heading">
+      <h2 id="logo-heading">Brand and logo</h2>
+      <p class="lede">The two paths bracket a central transition and continue forward after a disruptive event. Use the mark at 24px or larger, preserve one-eighth of its width as clear space, and keep it on a light, uncluttered background. The heading above is a page title, not an approved wordmark.</p>
+    </section>
+
+    <section aria-labelledby="color-heading">
+      <h2 id="color-heading">Color tokens</h2>
+      <div class="grid swatches">
+        <article class="swatch"><div class="swatch-color on-color" style="background:#234E70">Primary</div><div class="swatch-meta"><code>primary</code><code>#234E70</code></div></article>
+        <article class="swatch"><div class="swatch-color on-color" style="background:#0F766E">Secondary</div><div class="swatch-meta"><code>secondary</code><code>#0F766E</code></div></article>
+        <article class="swatch"><div class="swatch-color on-light" style="background:#F6F8FA">Background</div><div class="swatch-meta"><code>background</code><code>#F6F8FA</code></div></article>
+        <article class="swatch"><div class="swatch-color on-light" style="background:#FFFFFF">Surface</div><div class="swatch-meta"><code>surface</code><code>#FFFFFF</code></div></article>
+        <article class="swatch"><div class="swatch-color on-color" style="background:#17202A">Text</div><div class="swatch-meta"><code>text</code><code>#17202A</code></div></article>
+        <article class="swatch"><div class="swatch-color on-color" style="background:#B42318">Error</div><div class="swatch-meta"><code>error</code><code>#B42318</code></div></article>
+        <article class="swatch"><div class="swatch-color on-color" style="background:#146C43">Success</div><div class="swatch-meta"><code>success</code><code>#146C43</code></div></article>
+      </div>
+    </section>
+
+    <section aria-labelledby="scale-heading">
+      <h2 id="scale-heading">Typography and spacing</h2>
+      <p>System typography is provisional. Supported weights are 400, 600, and 700.</p>
+      <div class="grid scale-grid">
+        <div class="type-list" aria-label="Type scale">
+          <div class="type-row"><code>xs · 12/16</code><span class="t-xs">AfterImpact</span></div>
+          <div class="type-row"><code>sm · 14/20</code><span class="t-sm">AfterImpact</span></div>
+          <div class="type-row"><code>base · 16/24</code><span class="t-base">AfterImpact</span></div>
+          <div class="type-row"><code>lg · 20/28</code><span class="t-lg">AfterImpact</span></div>
+          <div class="type-row"><code>xl · 24/32</code><span class="t-xl">AfterImpact</span></div>
+          <div class="type-row"><code>2xl · 32/40</code><span class="t-2xl">AfterImpact</span></div>
+          <div class="type-row"><code>3xl · 40/48</code><span class="t-3xl">AfterImpact</span></div>
+        </div>
+        <div class="space-list" aria-label="Spacing scale">
+          <div class="space-row"><code>0 · 0px</code><span></span></div>
+          <div class="space-row"><code>1 · 4px</code><span class="space-bar" style="width:4px"></span></div>
+          <div class="space-row"><code>2 · 8px</code><span class="space-bar" style="width:8px"></span></div>
+          <div class="space-row"><code>3 · 12px</code><span class="space-bar" style="width:12px"></span></div>
+          <div class="space-row"><code>4 · 16px</code><span class="space-bar" style="width:16px"></span></div>
+          <div class="space-row"><code>6 · 24px</code><span class="space-bar" style="width:24px"></span></div>
+          <div class="space-row"><code>8 · 32px</code><span class="space-bar" style="width:32px"></span></div>
+          <div class="space-row"><code>12 · 48px</code><span class="space-bar" style="width:48px"></span></div>
+          <div class="space-row"><code>16 · 64px</code><span class="space-bar" style="width:64px"></span></div>
+        </div>
+      </div>
+      <p class="provisional">Provisional responsive breakpoints</p>
+      <div class="breakpoints" aria-label="Provisional breakpoints">
+        <span><strong>sm</strong> 30rem</span><span><strong>md</strong> 48rem</span><span><strong>lg</strong> 64rem</span><span><strong>xl</strong> 80rem</span>
+      </div>
+    </section>
+
+    <section aria-labelledby="component-heading">
+      <h2 id="component-heading">Components</h2>
+      <p>Hover the controls and use Tab to inspect their visible focus states. The outlined secondary button below also shows the focus treatment persistently.</p>
+      <div class="grid component-grid">
+        <article class="panel">
+          <h3>Buttons and links</h3>
+          <div class="actions">
+            <button class="button-primary" type="button">Primary action</button>
+            <button class="button-secondary focus-sample" type="button">Secondary action</button>
+            <a href="#component-heading">Example text link</a>
+          </div>
+        </article>
+        <article class="panel">
+          <h3>Input</h3>
+          <label for="example-field">Visible field label</label>
+          <input id="example-field" type="text" value="Example value" aria-describedby="field-hint">
+          <p class="hint" id="field-hint">Help text explains the expected value.</p>
+        </article>
+        <article class="panel">
+          <h3>Invalid input</h3>
+          <label for="invalid-field">Visible field label</label>
+          <input id="invalid-field" type="text" aria-invalid="true" aria-describedby="field-error">
+          <p class="field-error" id="field-error"><strong>Error:</strong> Explain what needs to change.</p>
+        </article>
+        <article class="panel">
+          <h3>Form feedback</h3>
+          <div class="feedback feedback-error" role="alert"><strong>Error</strong>Explain what happened and how to recover.</div>
+          <div class="feedback feedback-success" role="status"><strong>Success</strong>Confirm the completed action in plain language.</div>
+        </article>
+      </div>
+    </section>
+
+    <footer>Reference implementation for <code>DESIGN.md</code> · Target: WCAG 2.2 AA</footer>
+  </main>
+</body>
+</html>
