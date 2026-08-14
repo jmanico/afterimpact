@@ -29,6 +29,6 @@ All security and privacy requirements are authored in `SECURITY.md`, stated on t
 
 ## Workflow
 
-- Build, test, and run commands: deferred until the first implementation PR lands — no implementation or build tooling exists yet. Record them here in that PR.
+- Build, test, and run commands are deferred until the first implementation PR lands — no implementation exists yet. Record the commands here in that PR without reopening the technology and lint/format choices already fixed in `ARCHITECTURE.md`.
 - CI/CD, linting, and formatting: the platform and tooling choices are owned by `ARCHITECTURE.md`'s Technology Decisions (CI/CD and Lint/format rows); the pipeline's security posture (secret handling, scanning) is owned by `SECURITY.md` (SEC-DEPLOY-3, SEC-SECRET-1 — the `SQ-6` resolution).
 - Branch, commit, and pull-request conventions: no direct pushes to `main`; work on kebab-case topic branches; every change lands via a pull request with CI green; commit subjects are imperative mood, 72 characters or fewer; squash-merge is optional.

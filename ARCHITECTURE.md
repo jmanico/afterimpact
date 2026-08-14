@@ -12,10 +12,10 @@ Decided, and binding on implementation:
 | --- | --- |
 | Runtime environment | Web application and mobile application over a backend API |
 | Server framework | Quarkus / Kotlin |
-| Client framework | Compose Multiplatform (mobile: iOS + Android); React (web) |
+| Client framework | Compose Multiplatform (mobile: iOS + Android); React + TypeScript (web) |
 | API style | REST |
-| Authentication | WebAuthn passkeys (FR-1.2, D-9) |
-| Identity | Amazon Cognito (managed identity provider, OIDC). Constraint: the integration MUST be passkey-only per D-9 — password authenticators disabled. If Cognito cannot enforce passkey-only, this decision reverts to in-process WebAuthn and returns to the user |
+| Authentication | WebAuthn passkeys for normal access; verified-email OTP only for restricted first-passkey bootstrap and lost-passkey recovery (FR-1.2, FR-1.6, D-9) |
+| Identity | Amazon Cognito (managed identity provider). Its sign-in policy permits only `WEB_AUTHN` and `EMAIL_OTP`; `PASSWORD` and `SMS_OTP` are disabled, the app client enables `ALLOW_USER_AUTH`, and `AuthSessionValidity` is 10 minutes. All Cognito ceremonies terminate server-side at the API, which issues normal sessions after passkey authentication and restricted bootstrap/recovery sessions after email OTP |
 | Data model | Relational, third normal form |
 | Database | PostgreSQL (managed) |
 | File store | S3 object storage (SSE-KMS, lifecycle rules) |
@@ -25,7 +25,7 @@ Decided, and binding on implementation:
 | Hosting | AWS (EU regions available) |
 | Edge | CloudFront + AWS WAF |
 | CI/CD | GitHub Actions with AWS OIDC federation |
-| Lint/format | ktlint + detekt (Kotlin); web lint tooling follows the React implementation |
+| Lint/format | ktlint + detekt (Kotlin); ESLint flat configuration + Prettier (React/TypeScript) |
 | Deployment | Terraform |
 | Scale | ~1,000 concurrent users (D-14, `REQUIREMENTS.md`) |
 
@@ -35,7 +35,7 @@ No technology choice remains open in this document.
 
 ### Shape of the system
 
-A React web client and Compose Multiplatform mobile clients (iOS and Android) talk to a single backend REST API over TLS, fronted by a CloudFront + AWS WAF edge layer. The API is the sole trust boundary: clients hold no business rules beyond input affordances and local validation for responsiveness; every rule in FR-1–FR-9 (ownership checks, validation, status lifecycles, totals, timeline generation) is enforced server-side. Identity is delegated to Amazon Cognito (OIDC): the API exchanges the authorization code server-side as a backend-for-frontend and issues its own session — session mechanics are owned by `SECURITY.md` (SEC-SESSION-3). Behind the API sit a managed PostgreSQL database (3NF) for structured records, a private S3 file store for uploaded originals, and a background worker running as a separate service for time-driven and long-running work — separate rather than in-process so hostile-content parsing stays isolated from the API (SEC-FILE-6). Outbound email goes through AWS SES (required by FR-1.1, FR-1.7, FR-5.6); per D-7, outbound email and the managed identity service are the system's external service dependencies.
+A React/TypeScript web client and Compose Multiplatform mobile clients (iOS and Android) talk to a single backend REST API over TLS, fronted by a CloudFront + AWS WAF edge layer. The API is the sole trust boundary: clients hold no business rules beyond input affordances and local validation for responsiveness; every rule in FR-1–FR-9 (ownership checks, validation, status lifecycles, totals, timeline generation) is enforced server-side. Identity is delegated to Amazon Cognito: every Cognito ceremony and token exchange terminates server-side at the API as a backend-for-frontend, and Cognito tokens never reach a client. The API issues its own normal session after WebAuthn, or a separately scoped bootstrap/recovery session after verified-email OTP that can register one passkey and perform no other operation — session mechanics are owned by `SECURITY.md` (SEC-SESSION-3). Behind the API sit a managed PostgreSQL database (3NF) for structured records, a private S3 file store for uploaded originals, and a background worker running as a separate service for time-driven and long-running work — separate rather than in-process so hostile-content parsing stays isolated from the API (SEC-FILE-6). Outbound email goes through AWS SES (required by FR-1.1, FR-1.6, FR-1.7, FR-5.6); per D-7, outbound email and the managed identity service are the system's external service dependencies.
 
 Primary flows:
 
@@ -45,12 +45,12 @@ Primary flows:
 
 ### Components
 
-- **Web client (React)**
+- **Web client (React/TypeScript)**
   - **Responsibility:** All user-facing screens for the browser, implementing `DESIGN.md`'s tokens, components, focus/keyboard behavior, and WCAG 2.2 AA conformance (NFR-5.1); responsive from 360 px up (NFR-5.2) per the DESIGN.md grid and breakpoints; in-app viewing of PDFs and images (FR-3.5); severity-over-time charts (FR-4.3); in-app notification display (FR-5.6, FR-9.2); plain-language error presentation (NFR-5.3) and confirmation of every destructive action (NFR-5.5).
   - **Inputs:** User interaction; REST API responses; in-app notification feed.
   - **Outputs:** REST API requests; file downloads initiated for the user.
   - **Data owned or accessed:** Owns nothing durable. Accesses the signed-in user's data via the API; holds session credentials and transient UI state only.
-  - **Open decisions:** None. The web client is a separate React implementation of the shared design rather than Compose MP's Wasm-canvas target (CQ-2 resolved — see **Cross-document questions**): React renders native DOM semantics, so DESIGN.md's accessibility expectations and NFR-5.1 are satisfiable on web. Light and dark themes are both supported; DESIGN.md owns the theme conventions (DQ-3 resolved there).
+  - **Open decisions:** None. The web client is a separate React/TypeScript implementation of the shared design rather than Compose MP's Wasm-canvas target (CQ-2 resolved — see **Cross-document questions**): React renders native DOM semantics, so DESIGN.md's accessibility expectations and NFR-5.1 are satisfiable on web. Light and dark themes are both supported; DESIGN.md owns the theme conventions (DQ-3 resolved there).
 
 - **Mobile client (Compose MP)**
   - **Responsibility:** Same responsibilities as the web client on mobile form factors, from the shared Compose MP codebase, targeting iOS and Android and distributed through the App Store and Google Play. In-app notifications only — push channels are out of scope v1 (OQ-4).
@@ -67,11 +67,11 @@ Primary flows:
   - **Open decisions:** None. API versioning is by URL path: the initial surface is `/v1`, and a breaking change mints `/v2`. Every live API version MUST route through the SEC-AUTHZ-5 centralized enforcement layer and remain within the SEC-DEPLOY-4 patch gate, so an unmaintained old version cannot become an authorization or patching bypass reachable by any network attacker (T-38). Search does not extend to file contents/OCR in v1 (per FR-3.4, search stays metadata-only); if ever adopted, the resulting index is a personal-data store bound by SEC-TRUST-2 and SEC-DATA-1 (T-19) and its extraction step is a hostile-content parsing surface under SEC-FILE-6 (T-17).
 
 - **Identity & session handling**
-  - **Responsibility:** Registration with email verification (FR-1.1), passkey (WebAuthn) registration and authentication ceremonies (FR-1.2, FR-1.3), credential lifecycle — additional registration, listing, revocation (FR-1.8), sign-out with immediate session invalidation (FR-1.5), session lifetime enforcement (FR-1.10; lifetime values owned by REQUIREMENTS.md), account-level throttling of failed attempts (FR-1.4), email change with re-verification (FR-1.7), account recovery (FR-1.6; flow owned by SECURITY.md, SEC-AUTHN-6), and re-authentication before account deletion (FR-9.3). Credential ceremonies are delegated to Amazon Cognito as a managed external identity provider (see **Technology Decisions**, including the passkey-only constraint); the API application remains the session authority — it exchanges the Cognito OIDC code server-side as a backend-for-frontend and issues its own session, with session mechanics owned by SECURITY.md (SEC-SESSION-3).
-  - **Inputs:** Credential ceremonies and session tokens from clients; OIDC responses from Cognito.
+  - **Responsibility:** Registration with email verification (FR-1.1), passkey (WebAuthn) registration and authentication ceremonies (FR-1.2, FR-1.3), restricted verified-email-OTP bootstrap and recovery (FR-1.2, FR-1.6), credential lifecycle — additional registration, listing, revocation (FR-1.8), sign-out with immediate session invalidation (FR-1.5), session lifetime enforcement (FR-1.10; lifetime values owned by REQUIREMENTS.md), account-level throttling of failed attempts (FR-1.4), email change with re-verification (FR-1.7), and re-authentication before account deletion (FR-9.3). Credential ceremonies are delegated to Amazon Cognito under the exact factor policy in **Technology Decisions**; the API application remains the session authority, terminates every Cognito exchange server-side, and issues either a normal passkey-authenticated session or the operation-limited email-OTP session SEC-AUTHN-6 defines.
+  - **Inputs:** Passkey and email-OTP ceremonies from clients; server-side responses and tokens from Cognito.
   - **Outputs:** Sessions; entries in the security event log; verification and recovery emails via the email boundary.
   - **Data owned or accessed:** Owns the User entity's session records and verification tokens; passkey credential material is held by Cognito; nothing else.
-  - **Open decisions:** None. The account-recovery flow (SQ-2) and session token mechanics (SQ-3) are resolved in SECURITY.md.
+  - **Open decisions:** None. The email-OTP recovery flow (SQ-2) and session token mechanics (SQ-3) are resolved in SECURITY.md.
 
 - **Data persistence (relational, 3NF)**
   - **Responsibility:** Durable storage of all structured entities in **Data Entities** (REQUIREMENTS.md) in third normal form; referential integrity, including FR-6.3's rule that deleting a Contact preserves the contact's name as text on referencing records (denormalized name snapshot — a deliberate, documented 3NF exception); UTC timestamps on every record (NFR-6.1); exact decimal types for money (NFR-6.2); soft-delete state for the 30-day undo windows; document version lineage (FR-3.7) and journal entry versions (FR-8.4).
@@ -106,7 +106,7 @@ Primary flows:
 1. **Client ↔ API:** untrusted client to trusted server; TLS only (NFR-1.1); all authorization and validation server-side (FR-1.9). A CloudFront + AWS WAF edge layer sits on this boundary in front of the API, providing volumetric protection (T-21).
 2. **API ↔ stores (RDBMS, file store):** private network boundary; only the API application and background worker cross it. Backup artifacts and any further store that holds personal data (e.g., a separate search index, if the database-search decision is ever revisited) sit inside this boundary too (SEC-TRUST-2, T-19, T-31). Uploaded content crossing back toward clients is treated as hostile (NFR-1.5).
 3. **System ↔ email provider (AWS SES):** outbound external boundary; carries minimal personal data.
-4. **System ↔ identity provider (Amazon Cognito):** external identity dependency; carries credential ceremonies and the OIDC exchange. The API performs the code exchange server-side (SEC-SESSION-3), so Cognito tokens never reach the browser.
+4. **System ↔ identity provider (Amazon Cognito):** external identity dependency; carries passkey and email-OTP ceremonies and their token exchanges. The API terminates every exchange server-side (SEC-SESSION-3), so Cognito tokens never reach a browser or mobile client.
 
 Controls at these boundaries are specified in `SECURITY.md`.
 
@@ -116,8 +116,8 @@ Statuses: `SUPPORTED` (a named component is responsible), `PARTIALLY DEFINED` (r
 
 | Requirement group | Responsible component(s) | Status | Notes |
 | --- | --- | --- | --- |
-| FR-1.1–FR-1.5, FR-1.7–FR-1.10 (Accounts & Authentication) | Identity & session handling; REST API application | SUPPORTED | Passkey-only per D-9. FR-1.9 enforced on every API operation; FR-1.10 lifetime values are set in REQUIREMENTS.md. |
-| FR-1.6 (Account recovery) | Identity & session handling; Outbound email boundary (external) | SUPPORTED | Recovery-codes flow designed in SECURITY.md (SEC-AUTHN-6). |
+| FR-1.1–FR-1.5, FR-1.7–FR-1.10 (Accounts & Authentication) | Identity & session handling; REST API application | SUPPORTED | Normal access is passkey-only; Cognito email OTP creates only the restricted bootstrap/recovery session D-9 defines. FR-1.9 is enforced on every API operation; FR-1.10 lifetime values are set in REQUIREMENTS.md. |
+| FR-1.6 (Account recovery) | Identity & session handling; Outbound email boundary (external) | SUPPORTED | Ten-minute verified-email-OTP recovery and replacement-passkey flow designed in SECURITY.md (SEC-AUTHN-6). |
 | FR-2.1–FR-2.6 (Accident Cases) | REST API application; Data persistence; Background processing (FR-2.6 purge) | SUPPORTED | Case overview counts computed server-side (FR-2.4). |
 | FR-3.1–FR-3.8, FR-3.10 (Documents) | REST API application; File store; Data persistence; Background processing (FR-3.8 purge) | SUPPORTED | FR-3.4 file-content/OCR indexing is not in v1 — search is metadata-only (revisit against NFR-4.3). |
 | FR-3.9 (malware scan) | Background processing | SUPPORTED | Ships in v1: ClamAV in the isolated worker; flagged files quarantined per SEC-FILE-4. |
@@ -131,12 +131,12 @@ Statuses: `SUPPORTED` (a named component is responsible), `PARTIALLY DEFINED` (r
 | NFR-1 (Security), NFR-2 (Privacy) | All components | SUPPORTED | Authored with their controls in SECURITY.md; the boundaries they attach to are located in **Trust boundaries** above. |
 | NFR-3 (Reliability) | Data persistence; File store; Background processing (restore reconciliation) | SUPPORTED | PostgreSQL point-in-time recovery and S3 durability satisfy NFR-3.2/NFR-3.3; the NFR-3.1 availability target rests on AWS hosting. A restore under NFR-3.2 MUST reconcile post-backup deletions, credential revocations, and session invalidations (SEC-DATA-8, T-32, T-48). |
 | NFR-4 (Performance) | REST API application; Data persistence; File store | SUPPORTED | NFR-4.1/4.3 budgets sized for ~1,000 concurrent users (D-14); NFR-4.2 constrains the upload path. |
-| NFR-5 (Usability & Accessibility) | Web client; Mobile client | SUPPORTED | DESIGN.md implemented by the clients; the React web client renders native DOM semantics, so NFR-5.1 is claimable on web (CQ-2 resolved). |
+| NFR-5 (Usability & Accessibility) | Web client; Mobile client | SUPPORTED | DESIGN.md implemented by the clients; the React/TypeScript web client renders native DOM semantics, so NFR-5.1 is claimable on web (CQ-2 resolved). |
 | NFR-6 (Data Integrity) | Data persistence; REST API application | SUPPORTED | UTC storage, exact decimals in schema and API. |
 
 ## Cross-document questions
 
 None open. Resolved questions are recorded here so the IDs stay traceable:
 
-- **CQ-2 (resolved)** The web client is a separate React implementation of the shared design; Compose Multiplatform serves mobile only. React renders native DOM semantics, so DESIGN.md's accessibility expectations (WCAG 2.2 AA, system fonts) and NFR-5.1 are satisfiable on web. Its security consequences (SQ-4) are resolved in SECURITY.md.
+- **CQ-2 (resolved)** The web client is a separate React/TypeScript implementation of the shared design; Compose Multiplatform serves mobile only. React renders native DOM semantics, so DESIGN.md's accessibility expectations (WCAG 2.2 AA, system fonts) and NFR-5.1 are satisfiable on web. Its security consequences (SQ-4) are resolved in SECURITY.md.
 - **CQ-3 (resolved)** The FR-2.6/FR-3.8 confirmation copy is reconciled to state the recovery window, eventual permanent deletion, and backup lag truthfully (copy owned by `DESIGN.md` / `REQUIREMENTS.md`), and SEC-DATA-8 bounds how long purged records may survive in backups (`SECURITY.md`). Its privacy facet, threat T-33, is closed.
