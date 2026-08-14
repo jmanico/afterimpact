@@ -108,9 +108,20 @@ Use Given/When/Then or an equally explicit pass/fail form.
 
 - **Upstream Requirements**: [Requirement IDs that MUST be satisfied first, or `None`]
 - **Downstream Requirements**: [Requirement IDs that depend on this requirement, or `None`]
+- **Child Requirements**: [Optional. Include only on a decomposition requirement — one whose delivery is the sum of its children rather than behavior of its own. Omit the field entirely on a leaf requirement rather than writing `None`.]
 - **External Dependencies**: [Third-party services, identity providers, APIs, cryptographic services, hardware services, or `None`]
 - **Dependency Assumptions**: [Security, availability, data-integrity, or contractual assumptions made about external dependencies]
 - **Failure Impact**: [Effect of an unavailable, compromised, slow, or malformed dependency response]
+
+A **Child Requirements** field MUST list every child, in build order, one child per line in the form:
+
+```
+  - [ ] <child issue URL> — <child Title>
+```
+
+The label MUST reproduce the child's Metadata **Title** verbatim; an abbreviated issue title MUST NOT be substituted for it. Every child MUST appear exactly once, and MUST NOT be listed under any other parent. A decomposition requirement MUST NOT reach `Verified` until every child has reached `Verified`.
+
+Children MUST NOT be restated under **Downstream Requirements**, which records requirements that depend on this one — not requirements that compose it.
 
 ## Implementation Notes
 
