@@ -29,6 +29,6 @@ All security and privacy requirements are authored in `SECURITY.md`, stated on t
 
 ## Workflow
 
-- Build, test, and run commands: `TO BE DECIDED` — no implementation or build tooling exists yet. Add them here once they do.
-- CI/CD, linting, and formatting: `TO BE DECIDED` (`SQ-6`).
-- Branch, commit, and pull-request conventions: `TO BE DECIDED`.
+- Build, test, and run commands: deferred until the first implementation PR lands — no implementation or build tooling exists yet. Record them here in that PR.
+- CI/CD, linting, and formatting: the platform and tooling choices are owned by `ARCHITECTURE.md`'s Technology Decisions (CI/CD and Lint/format rows); the pipeline's security posture (secret handling, scanning) is owned by `SECURITY.md` (SEC-DEPLOY-3, SEC-SECRET-1 — the `SQ-6` resolution).
+- Branch, commit, and pull-request conventions: no direct pushes to `main`; work on kebab-case topic branches; every change lands via a pull request with CI green; commit subjects are imperative mood, 72 characters or fewer; squash-merge is optional.
