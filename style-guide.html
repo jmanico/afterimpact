@@ -22,6 +22,7 @@
       --s8: 32px;
       --s12: 48px;
       --s16: 64px;
+      --on-fill: var(--surface);
     }
 
     * { box-sizing: border-box; }
@@ -42,19 +43,23 @@
     section { margin-bottom: var(--s8); }
     code { font-size: .875em; }
     .lede { max-width: 68ch; margin: 0; }
-    .provisional {
-      display: inline-block;
-      margin-top: var(--s2);
-      padding: var(--s1) var(--s2);
+    .theme-dark {
+      --primary: #8FB8DC;
+      --secondary: #5CC8BE;
+      --background: #0F1720;
+      --surface: #1A2530;
+      --text: #E7EDF3;
+      --error: #F5928A;
+      --success: #6FCF97;
+      --on-fill: var(--background);
+      color-scheme: dark;
+    }
+    .swatches.theme-dark {
+      padding: var(--s4);
       border: 1px solid var(--primary);
-      border-radius: var(--s1);
-      color: var(--primary);
-      background: var(--surface);
-      font-size: .75rem;
-      line-height: 1rem;
-      font-weight: 700;
-      letter-spacing: .03em;
-      text-transform: uppercase;
+      border-radius: var(--s2);
+      background: var(--background);
+      color: var(--text);
     }
     .notice, .panel, .swatch, .type-row, .space-row, .feedback {
       border: 1px solid var(--primary);
@@ -74,7 +79,7 @@
     }
     .swatch-meta { padding: var(--s3); }
     .swatch-meta code { display: block; }
-    .on-color { color: var(--surface); }
+    .on-color { color: var(--on-fill); }
     .on-light { color: var(--text); }
     .type-list, .space-list { display: grid; gap: var(--s2); }
     .type-row { display: grid; grid-template-columns: 5rem 1fr; align-items: baseline; gap: var(--s4); padding: var(--s3); }
@@ -95,7 +100,7 @@
     .actions { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: center; }
     button, input { min-height: 44px; border-radius: var(--s2); font: 600 1rem/1.5 var(--font); }
     button { padding: var(--s2) var(--s4); cursor: pointer; transition: background-color 120ms ease; }
-    .button-primary { border: 1px solid var(--primary); color: var(--surface); background: var(--primary); }
+    .button-primary { border: 1px solid var(--primary); color: var(--on-fill); background: var(--primary); }
     .button-secondary { border: 1px solid var(--primary); color: var(--primary); background: var(--surface); }
     button:hover { text-decoration: underline; text-underline-offset: .18em; }
     .button-secondary:hover { background: var(--background); }
@@ -139,22 +144,23 @@
     </svg>
     <div>
       <h1>AfterImpact design language</h1>
-      <span class="provisional">Provisional foundation</span>
     </div>
   </header>
 
   <main>
     <div class="notice">
-      <strong>Pending decisions:</strong> brand personality (DQ-1), light/dark mode (DQ-3), existing brand assets (DQ-4), and brand typography (DQ-5) are unresolved in <code>DESIGN.md</code>. The light theme and system font shown here are provisional defaults. Platform targets are decided: web and mobile.
+      <strong>Decided system:</strong> the brand personality (calm, competent, reassuring — DQ-1), light and dark themes following the OS preference with a manual override (DQ-3), <code>logo.svg</code> as the only mark (DQ-4), the system font stack (DQ-5), and the responsive breakpoints are final in <code>DESIGN.md</code>. This page is its rendered reference.
     </div>
 
     <section aria-labelledby="logo-heading">
       <h2 id="logo-heading">Brand and logo</h2>
-      <p class="lede">The two paths bracket a central transition and continue forward after a disruptive event. Use the mark at 24px or larger, preserve one-eighth of its width as clear space, and keep it on a light, uncluttered background. The heading above is a page title, not an approved wordmark.</p>
+      <p class="lede">The two paths bracket a central transition and continue forward after a disruptive event. Use the mark at 24px or larger, preserve one-eighth of its width as clear space, and keep it on an uncluttered <code>background</code> or <code>surface</code>; in each theme its paths render with that theme's <code>primary</code> and <code>secondary</code> values. The product name typeset in the primary UI family is the interim wordmark; a designed lockup is post-v1.</p>
     </section>
 
     <section aria-labelledby="color-heading">
       <h2 id="color-heading">Color tokens</h2>
+      <p class="lede">Both themes ship; clients follow the OS preference with a manual override. Tokens keep their names and roles across themes — components reference tokens, never raw hex values.</p>
+      <h3>Light theme</h3>
       <div class="grid swatches">
         <article class="swatch"><div class="swatch-color on-color" style="background:#234E70">Primary</div><div class="swatch-meta"><code>primary</code><code>#234E70</code></div></article>
         <article class="swatch"><div class="swatch-color on-color" style="background:#0F766E">Secondary</div><div class="swatch-meta"><code>secondary</code><code>#0F766E</code></div></article>
@@ -164,11 +170,21 @@
         <article class="swatch"><div class="swatch-color on-color" style="background:#B42318">Error</div><div class="swatch-meta"><code>error</code><code>#B42318</code></div></article>
         <article class="swatch"><div class="swatch-color on-color" style="background:#146C43">Success</div><div class="swatch-meta"><code>success</code><code>#146C43</code></div></article>
       </div>
+      <h3>Dark theme</h3>
+      <div class="grid swatches theme-dark">
+        <article class="swatch"><div class="swatch-color on-color" style="background:#8FB8DC">Primary</div><div class="swatch-meta"><code>primary</code><code>#8FB8DC</code></div></article>
+        <article class="swatch"><div class="swatch-color on-color" style="background:#5CC8BE">Secondary</div><div class="swatch-meta"><code>secondary</code><code>#5CC8BE</code></div></article>
+        <article class="swatch"><div class="swatch-color on-light" style="background:#0F1720">Background</div><div class="swatch-meta"><code>background</code><code>#0F1720</code></div></article>
+        <article class="swatch"><div class="swatch-color on-light" style="background:#1A2530">Surface</div><div class="swatch-meta"><code>surface</code><code>#1A2530</code></div></article>
+        <article class="swatch"><div class="swatch-color on-color" style="background:#E7EDF3">Text</div><div class="swatch-meta"><code>text</code><code>#E7EDF3</code></div></article>
+        <article class="swatch"><div class="swatch-color on-color" style="background:#F5928A">Error</div><div class="swatch-meta"><code>error</code><code>#F5928A</code></div></article>
+        <article class="swatch"><div class="swatch-color on-color" style="background:#6FCF97">Success</div><div class="swatch-meta"><code>success</code><code>#6FCF97</code></div></article>
+      </div>
     </section>
 
     <section aria-labelledby="scale-heading">
       <h2 id="scale-heading">Typography and spacing</h2>
-      <p>System typography is provisional. Supported weights are 400, 600, and 700.</p>
+      <p>The system font stack is final. Supported weights are 400, 600, and 700.</p>
       <div class="grid scale-grid">
         <div class="type-list" aria-label="Type scale">
           <div class="type-row"><code>xs · 12/16</code><span class="t-xs">AfterImpact</span></div>
@@ -191,7 +207,7 @@
           <div class="space-row"><code>16 · 64px</code><span class="space-bar" style="width:64px"></span></div>
         </div>
       </div>
-      <p class="provisional">Responsive breakpoints</p>
+      <h3>Responsive breakpoints</h3>
       <div class="breakpoints" aria-label="Responsive breakpoints">
         <span><strong>sm</strong> 30rem</span><span><strong>md</strong> 48rem</span><span><strong>lg</strong> 64rem</span><span><strong>xl</strong> 80rem</span>
       </div>
