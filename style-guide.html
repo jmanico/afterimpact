@@ -238,6 +238,17 @@
           <p class="field-error" id="field-error"><strong>Error:</strong> Explain what needs to change.</p>
         </article>
         <article class="panel">
+          <h3>Email-code recovery</h3>
+          <p>Check your verified email, then enter the one-time code. Account data remains locked until you register a passkey.</p>
+          <label for="email-code">One-time code</label>
+          <input id="email-code" type="text" inputmode="numeric" autocomplete="one-time-code" aria-describedby="email-code-hint">
+          <p class="hint" id="email-code-hint">Show the expiry in plain language and offer a clearly labeled resend action without urgency styling.</p>
+        </article>
+        <article class="panel">
+          <h3>User-authored content</h3>
+          <p>Render v1 content as plain text. Preserve meaningful line breaks; do not interpret Markdown or rich text. Turn user-supplied values into links only when <code>SEC-OUT-3</code> permits.</p>
+        </article>
+        <article class="panel">
           <h3>Form feedback</h3>
           <div class="feedback feedback-error" role="alert"><strong>Error</strong>Explain what happened and how to recover.</div>
           <div class="feedback feedback-success" role="status"><strong>Success</strong>Confirm the completed action in plain language.</div>
