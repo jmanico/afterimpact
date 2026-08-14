@@ -61,7 +61,7 @@
       background: var(--background);
       color: var(--text);
     }
-    .notice, .panel, .swatch, .type-row, .space-row, .feedback {
+    .notice, .panel, .swatch, .type-row, .space-row, .feedback, .banner, .confirm, .trash-entry, .lock-panel {
       border: 1px solid var(--primary);
       border-radius: var(--s2);
       background: var(--surface);
@@ -123,6 +123,17 @@
     .feedback-error { border-color: var(--error); color: var(--error); }
     .feedback-success { border-color: var(--success); color: var(--success); }
     .feedback strong { display: block; }
+    .button-destructive { border: 1px solid var(--error); color: var(--on-fill); background: var(--error); }
+    .banner, .confirm { padding: var(--s4); }
+    .banner p, .confirm p { margin-bottom: var(--s3); }
+    .banner p:last-of-type, .confirm p:last-of-type { margin-bottom: var(--s4); }
+    .trash-entry { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s3); padding: var(--s3) var(--s4); }
+    .trash-entry p { margin: var(--s1) 0 0; }
+    .mask { margin: 0 0 var(--s3); }
+    .mask-bar { display: block; height: var(--s3); max-width: 100%; margin-bottom: var(--s2); border-radius: var(--s1); background: var(--text); opacity: .18; }
+    .lock-panel { display: grid; justify-items: center; gap: var(--s3); padding: var(--s8) var(--s4); text-align: center; }
+    .lock-panel svg { width: 48px; height: 48px; }
+    .lock-panel p { margin: 0; }
     footer { padding: 0 0 var(--s8); font-size: .875rem; }
 
     @media (min-width: 48rem) {
@@ -138,9 +149,9 @@
   <header>
     <svg viewBox="0 0 64 64" role="img" aria-labelledby="mark-title mark-desc">
       <title id="mark-title">AfterImpact mark</title>
-      <desc id="mark-desc">Two offset, rounded paths in dark blue and teal.</desc>
-      <path fill="#234E70" d="M8 10h12v24c0 6.627 5.373 12 12 12h4v12h-4C18.745 58 8 47.255 8 34V10Z"/>
-      <path fill="#0F766E" d="M28 6h4c13.255 0 24 10.745 24 24v24H44V30c0-6.627-5.373-12-12-12h-4V6Z"/>
+      <desc id="mark-desc">Two offset, rounded paths in the theme's primary and secondary colors.</desc>
+      <path fill="var(--primary)" d="M8 10h12v24c0 6.627 5.373 12 12 12h4v12h-4C18.745 58 8 47.255 8 34V10Z"/>
+      <path fill="var(--secondary)" d="M28 6h4c13.255 0 24 10.745 24 24v24H44V30c0-6.627-5.373-12-12-12h-4V6Z"/>
     </svg>
     <div>
       <h1>AfterImpact design language</h1>
@@ -149,7 +160,7 @@
 
   <main>
     <div class="notice">
-      <strong>Decided system:</strong> the brand personality (calm, competent, reassuring — DQ-1), light and dark themes following the OS preference with a manual override (DQ-3), <code>logo.svg</code> as the only mark (DQ-4), the system font stack (DQ-5), and the responsive breakpoints are final in <code>DESIGN.md</code>. This page is its rendered reference.
+      <strong>Decided system:</strong> the brand personality (calm, competent, reassuring — DQ-1), light and dark themes following the OS preference with a manual override (DQ-3), <code>logo.svg</code> as the only mark (DQ-4), the system font stack (DQ-5), the on-screen privacy conventions (DQ-6), and the responsive breakpoints are final in <code>DESIGN.md</code>. This page is its rendered reference.
     </div>
 
     <section aria-labelledby="logo-heading">
@@ -252,6 +263,77 @@
           <h3>Form feedback</h3>
           <div class="feedback feedback-error" role="alert"><strong>Error</strong>Explain what happened and how to recover.</div>
           <div class="feedback feedback-success" role="status"><strong>Success</strong>Confirm the completed action in plain language.</div>
+        </article>
+        <article class="panel">
+          <h3>Second-passkey prompt</h3>
+          <div class="banner">
+            <p>Your account has one passkey. Add a second so losing one device does not mean account recovery.</p>
+            <div class="actions">
+              <button class="button-primary" type="button">Add a passkey</button>
+              <button class="button-secondary" type="button">Not now</button>
+            </div>
+          </div>
+          <p class="hint">A dismissible banner at the top of the case list after each sign-in, never a modal; dismissal lasts for that session only, so it returns at the next sign-in until a second credential exists.</p>
+        </article>
+        <article class="panel">
+          <h3>Destructive-action confirmation</h3>
+          <div class="confirm" role="group" aria-labelledby="confirm-title">
+            <p id="confirm-title"><strong>Delete this case?</strong></p>
+            <p>Deleting <em>Rear-end collision, 14 March</em> removes every document, health record, task, contact, expense, and journal entry it holds. It stays restorable from trash for the recovery window <code>FR-2.6</code> sets, then the deletion is permanent; purged records leave backups within the further bound <code>SEC-DATA-8</code> sets.</p>
+            <div class="actions">
+              <button class="button-destructive" type="button">Delete case</button>
+              <button class="button-secondary" type="button">Keep case</button>
+            </div>
+          </div>
+          <p class="hint">The same shape covers every record type <code>NFR-5.5</code> reaches — tasks, contacts, and expenses among them: what is removed, the recovery window, when it becomes permanent, the backup lag, and a confirming control labeled with the action.</p>
+        </article>
+        <article class="panel">
+          <h3>Trash entry</h3>
+          <div class="trash-entry">
+            <div>
+              <strong>Estimate from the body shop</strong>
+              <p class="hint">Document &middot; deleted 18 May &middot; restorable for 12 more days</p>
+            </div>
+            <button class="button-secondary" type="button">Restore</button>
+          </div>
+          <p class="hint">One trash per case lists every soft-deleted record in it; deleted cases sit in an account-level trash. Every entry shows what it is, when it was deleted, the window it has left, and a labeled restore action.</p>
+        </article>
+        <article class="panel">
+          <h3>Journal notice (one-time)</h3>
+          <div class="feedback" role="status"><strong>Before you write</strong>Creation and last-edited timestamps on a journal entry are permanent and appear in exports handed to insurers, attorneys, and providers.</div>
+          <p class="hint">Shown once, the first time the user creates or edits a journal entry — not on every entry, and never as an interruption mid-writing.</p>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="privacy-heading">
+      <h2 id="privacy-heading">On-screen privacy</h2>
+      <p class="lede">Masking and re-lock protect health, journal, and legal content on a shared or observed device. Which content is flagged sensitive is the entity-level classification in <code>REQUIREMENTS.md</code> <strong>Data Entities</strong>; these examples show only how flagged content behaves.</p>
+      <div class="grid component-grid">
+        <article class="panel">
+          <h3>Masked content</h3>
+          <p><strong>Progress update &middot; 2 June</strong></p>
+          <div class="mask" aria-hidden="true">
+            <span class="mask-bar" style="width:16rem"></span>
+            <span class="mask-bar" style="width:12rem"></span>
+            <span class="mask-bar" style="width:14rem"></span>
+          </div>
+          <button class="button-secondary" type="button" aria-expanded="false">Reveal progress update</button>
+          <p class="hint">The placeholder carries no content and is hidden from assistive technology rather than read out; the reveal control is labeled, keyboard reachable, and never the default state.</p>
+        </article>
+        <article class="panel">
+          <h3>Re-lock panel</h3>
+          <div class="lock-panel">
+            <svg viewBox="0 0 64 64" role="img" aria-labelledby="lock-mark-title lock-mark-desc">
+              <title id="lock-mark-title">AfterImpact mark</title>
+              <desc id="lock-mark-desc">Two offset, rounded paths in the theme's primary and secondary colors.</desc>
+              <path fill="var(--primary)" d="M8 10h12v24c0 6.627 5.373 12 12 12h4v12h-4C18.745 58 8 47.255 8 34V10Z"/>
+              <path fill="var(--secondary)" d="M28 6h4c13.255 0 24 10.745 24 24v24H44V30c0-6.627-5.373-12-12-12h-4V6Z"/>
+            </svg>
+            <p><strong>AfterImpact</strong></p>
+            <button class="button-primary" type="button">Unlock</button>
+          </div>
+          <p class="hint">The same content-free panel serves the task-switcher snapshot: the mark, the product name, and an unlock action — no record data, counts, or notification content.</p>
         </article>
       </div>
     </section>

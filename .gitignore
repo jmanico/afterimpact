@@ -1,0 +1,5 @@
+# Draft issue bodies were used to create the GitHub issues and are now redundant:
+# the issues themselves are the live record, and local copies would silently go stale.
+# ISSUE_PLAN.md and ISSUE_MAP.md are kept — they carry the traceability that the issues
+# do not.
+.planning/github-issues/[0-9][0-9][0-9]-REQ-*.md
